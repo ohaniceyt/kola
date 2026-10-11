@@ -481,6 +481,9 @@
     text-shadow:0 1px 2px rgba(0,0,0,.25); transition:all .15s;
   }
   .theme-swatch.on { border-color:var(--label); box-shadow:0 0 0 3px var(--fill); }
+  .lg h3 { font-size:15px; font-weight:700; margin:16px 0 4px; }
+  .lg p { font-size:14px; color:var(--secondary-label); line-height:1.55; margin:4px 0 10px; word-break:break-word; }
+  .lg p a { color:var(--link); font-weight:600; text-decoration:none; }
   .rowbtn {
     width:44px; height:44px; margin:-8px -4px; display:inline-flex; align-items:center; justify-content:center;
     font-size:16px; cursor:pointer; border-radius:12px;
@@ -824,8 +827,26 @@
       <div class="n" style="color:var(--red);font-weight:600">Effacer toutes les données</div>
     </div>
   </div>
+  <div class="list-header" style="margin-top:20px"><span class="t">Légal</span></div>
+  <div class="group">
+    <div class="setrow" onclick="openLegalSheet('mentions')" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(88,86,214,.15)">📋</div>
+      <div class="n">Mentions légales</div>
+      <div class="v chev">›</div>
+    </div>
+    <div class="setrow" onclick="openLegalSheet('confidentialite')" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(52,199,89,.15)">🔒</div>
+      <div class="n">Politique de confidentialité</div>
+      <div class="v chev">›</div>
+    </div>
+    <div class="setrow" onclick="openLegalSheet('cgu')" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(148,148,148,.15)">📄</div>
+      <div class="n">Conditions d'utilisation</div>
+      <div class="v chev">›</div>
+    </div>
+  </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.4.1</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.5</div></div>
   </div>
 </div>
 
@@ -1296,6 +1317,13 @@
   <button class="btn-ghost" onclick="closeThemeSheet()" style="color:var(--secondary-label)">Fermer</button>
 </div>
 
+<div class="sheet" id="legal-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="legal-sheet-title">Mentions légales</h2>
+  <div class="lg" id="legal-body"></div>
+  <button class="btn-ghost" onclick="closeLegalSheet()" style="color:var(--secondary-label)">Fermer</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1519,6 +1547,78 @@ function renderBooksRow(){
   const b = curBook();
   el.textContent = `${getBooks().length} · ${b ? b.name : ""}`;
 }
+/* ============ Pages légales (FR/EN, 100% statique) ============ */
+const LEGAL_TITLES = {
+  mentions:        ["Mentions légales", "Legal notices"],
+  confidentialite: ["Politique de confidentialité", "Privacy policy"],
+  cgu:             ["Conditions d'utilisation", "Terms of use"],
+};
+const LEGAL = {
+  mentions: [
+    ["h", "Éditeur", "Publisher"],
+    ["p", "L'application Kola est développée et maintenue par Koami Parfait. Contact : via le dépôt GitHub du projet, en ouvrant une issue.",
+          "The Kola app is developed and maintained by Koami Parfait. Contact: via the project's GitHub repository, by opening an issue."],
+    ["h", "Code source", "Source code"],
+    ["p", "Kola est un logiciel libre, distribué sous licence MIT. Le code source complet est consultable et vérifiable par chacun : https://github.com/ohaniceyt/kola",
+          "Kola is free software, distributed under the MIT license. The complete source code is viewable and verifiable by anyone: https://github.com/ohaniceyt/kola"],
+    ["h", "Hébergement", "Hosting"],
+    ["p", "Le site et l'application sont hébergés par GitHub Pages (GitHub Inc., 88 Colin P. Kelly Jr. Street, San Francisco, États-Unis).",
+          "The site and the app are hosted by GitHub Pages (GitHub Inc., 88 Colin P. Kelly Jr. Street, San Francisco, United States)."],
+    ["h", "Cookies et traceurs", "Cookies and trackers"],
+    ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
+          "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
+    ["h", "Version", "Version"],
+    ["p", "Kola v0.5 — dernière mise à jour : octobre 2026.", "Kola v0.5 — last updated: October 2026."],
+  ],
+  confidentialite: [
+    ["h", "L'essentiel", "The essentials"],
+    ["p", "Kola suit tes dépenses 100% en local : aucune donnée ne quitte jamais ton appareil. Pas de compte, pas de serveur, pas d'outils d'analyse, pas de publicité.",
+          "Kola tracks your expenses 100% on your device: no data ever leaves your device. No account, no server, no analytics, no ads."],
+    ["h", "Données stockées sur ton appareil", "Data stored on your device"],
+    ["p", "Ton prénom éventuel, tes dépenses, enveloppes, objectifs, récurrences, catégories et préférences sont enregistrés uniquement sur cet appareil (localStorage et IndexedDB du navigateur). Kola n'accède à rien d'autre : ni photos, ni fichiers, ni géolocalisation.",
+          "Your name (optional), expenses, envelopes, goals, recurring items, categories and preferences are stored only on this device (browser localStorage and IndexedDB). Kola accesses nothing else: no photos, no files, no location."],
+    ["h", "Aucune transmission", "No transmission"],
+    ["p", "Rien n'est envoyé automatiquement, jamais. Les sauvegardes (fichiers JSON ou CSV) sont créées à ta demande et transitent par tes propres canaux (Mail, AirDrop, WhatsApp…) — jamais par nous.",
+          "Nothing is sent automatically, ever. Backups (JSON or CSV files) are created on demand and travel through your own channels (Mail, AirDrop, WhatsApp…) — never through us."],
+    ["h", "Partage en direct (budget couple)", "Direct sharing (couple budget)"],
+    ["p", "Si tu actives le budget couple, les dépenses du livre actif peuvent être échangées de pair à pair entre deux appareils du même réseau Wi-Fi local (WebRTC), via un QR ou un fichier échangé par tes soins. Aucun serveur ne stocke ces données, et rien ne transite par l'appareil des autres personnes.",
+          "If you enable the couple budget, the active book's expenses can be shared peer-to-peer between two devices on the same local Wi-Fi network (WebRTC), via a QR code or a file you exchange. No server stores this data, and it never passes through anyone else's device."],
+    ["h", "Droits", "Rights"],
+    ["p", "Tu maîtrises tout : export complet à tout moment (Réglages → Exporter), effacement intégral (Réglages → Effacer toutes les données), ou désinstallation de l'app — qui supprime définitivement toutes les données.",
+          "You control everything: full export at any time (Settings → Export), complete erasure (Settings → Erase all data), or uninstalling the app — which permanently deletes all data."],
+    ["h", "Contact", "Contact"],
+    ["p", "Une question sur ta vie privée ? Ouvre une issue sur https://github.com/ohaniceyt/kola", "A privacy question? Open an issue at https://github.com/ohaniceyt/kola"],
+  ],
+  cgu: [
+    ["h", "Objet", "Purpose"],
+    ["p", "Kola est une application gratuite de suivi de dépenses, utilisable hors ligne et 100% en local. L'installation et l'utilisation de l'application valent acceptation des présentes conditions.",
+          "Kola is a free expense-tracking app, usable offline and 100% on your device. Installing and using the app means you accept these terms."],
+    ["h", "Fourniture « en l'état »", "Provided as is"],
+    ["p", "Kola est fournie telle quelle (licence MIT), sans garantie expresse ou implicite. Le développeur s'efforce d'assurer la fiabilité et la sécurité des données, sans que cela constitue une obligation de résultat.",
+          "Kola is provided as is (MIT license), without express or implied warranty. The developer strives to ensure data reliability and security, but this does not constitute an obligation of result."],
+    ["h", "Responsabilité", "Liability"],
+    ["p", "Tu es seul responsable de tes sauvegardes (l'app t'en rappelle régulièrement) et de l'usage que tu fais de l'application. Kola ne fournit aucun conseil financier, fiscal ou comptable.",
+          "You are solely responsible for your backups (the app reminds you regularly) and for how you use the app. Kola provides no financial, tax or accounting advice."],
+    ["h", "Limites", "Limits"],
+    ["p", "Kola ne peut être tenue responsable d'une perte de données liée à la désinstallation, au changement d'appareil, au vidage du stockage du navigateur ou à un navigateur en mode privé. Des sauvegardes régulières sont recommandées.",
+          "Kola cannot be held liable for data loss caused by uninstalling, changing devices, clearing browser storage, or private browsing. Regular backups are recommended."],
+    ["h", "Évolution", "Evolution"],
+    ["p", "Kola peut évoluer (fonctionnalités, corrections, thèmes). Toute modification substantielle des présentes conditions sera signalée dans l'application. Version : octobre 2026.",
+          "Kola may evolve (features, fixes, themes). Any substantial change to these terms will be announced in the app. Version: October 2026."],
+  ],
+};
+function openLegalSheet(key){
+  const d = LEGAL[key]; if (!d) return;
+  const en = (typeof LANG !== "undefined" && LANG === "en");
+  document.getElementById("legal-sheet-title").textContent = t((LEGAL_TITLES[key]||[])[en?1:0] || (LEGAL_TITLES[key]||[])[0]);
+  document.getElementById("legal-body").innerHTML = d.map(([kind, fr, enTxt]) =>
+    `<${kind === "h" ? "h3" : "p"}>${esc((en ? enTxt : fr) || fr).replace(/\b(https:\/\/[^\s<]+)\b/g, m2 => `<a href="${m2}" target="_blank" rel="noopener">${m2}</a>`)}</${kind === "h" ? "h3" : "p"}>`).join("");
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("legal-sheet").classList.add("show"); syncScrollLock();
+}
+function closeLegalSheet(){ const sl = document.getElementById("legal-sheet");
+  if (sl){ sl.classList.remove("show"); clearSheetOverlay(); } }
+
 /* --- Thème (palette par livre ou globale) --- */
 function openThemeSheet(){
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
@@ -2107,6 +2207,12 @@ const I18N_EN = {
   "Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.":"Delete book “{a}” and its {n} expense(s)? This cannot be undone.",
   "{n} livre(s)":"{n} book(s)",
   "Renommer":"Rename",
+  /* --- Légal --- */
+  "Légal":"Legal",
+  "Mentions légales":"Legal notices",
+  "Politique de confidentialité":"Privacy policy",
+  "Conditions d'utilisation":"Terms of use",
+  "Fermer":"Close",
   "Un livre par suivi":"One book per ledger",
   "Sépare tes comptes : un livre Personnel, un pour la maison, un pour ton enfant… Bascule en un tap depuis l'accueil — et chaque livre peut avoir sa couleur.":"Separate your ledgers: one Personal book, one for home, one for your child… Switch with one tap from Home — and each book can have its own color.",
   "🪙 Personnel":"🪙 Personal",

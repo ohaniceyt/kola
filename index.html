@@ -37,7 +37,7 @@
 <title>Kola — Dépenses &amp; Budget</title>
 <style>
   :root {
-    --blue: #007aff; --green: #34c759; --red: #ff3b30; --orange: #ff9500;
+    --blue: #10b981; --green: #34c759; --red: #ff3b30; --orange: #ff9500;
     --yellow: #ffcc00; --purple: #af52de; --pink: #ff2d55; --teal: #5ac8fa; --indigo: #5856d6;
     --bg: #f2f2f7; --bg-elevated: #ffffff; --card: #ffffff;
     --label: #000000; --secondary-label: #6d6d72; --tertiary-label: rgba(60,60,67,.3);
@@ -212,7 +212,7 @@
     position:fixed; right:18px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index:21;
     width:56px; height:56px; border-radius:50%; border:0; cursor:pointer;
     background: var(--blue); color:#fff; font-size:28px; font-weight:300; line-height:1;
-    box-shadow: 0 4px 14px rgba(0,122,255,.45);
+    box-shadow: 0 4px 14px rgba(16,185,129,.45);
     display:flex; align-items:center; justify-content:center;
     transition: transform .2s cubic-bezier(.32,.72,.33,1.4);
   }
@@ -242,7 +242,7 @@
     border:0; border-radius: 12px; background: var(--fill); color: var(--label); outline:none;
     transition: box-shadow .2s;
   }
-  .field input:focus { box-shadow: 0 0 0 3px rgba(0,122,255,.4); }
+  .field input:focus { box-shadow: 0 0 0 3px rgba(16,185,129,.4); }
   .amount-input { display:flex; align-items:baseline; }
   .amount-input .cur { font-size: 28px; font-weight: 700; margin-right: 6px; color: var(--tertiary-label); }
   .amount-input input { font-size: 32px !important; font-weight: 800; padding: 12px 14px !important; font-variant-numeric:tabular-nums; }
@@ -254,7 +254,7 @@
     background: var(--fill); border: 2px solid transparent; cursor:pointer;
     font-size: 15px; font-weight: 600; font-family:inherit; color: var(--label); transition: all .15s;
   }
-  .cat.on { border-color: var(--blue); background: rgba(0,122,255,.1); }
+  .cat.on { border-color: var(--blue); background: rgba(16,185,129,.1); }
   .btn-primary {
     width:100%; margin-top: 20px; padding: 15px; border-radius: 14px; border:0; cursor:pointer;
     background: var(--blue); color:#fff; font-size:17px; font-weight: 700; font-family:inherit;
@@ -327,7 +327,7 @@
     font-size:13px; font-weight:600; padding:9px 13px; border-radius: 20px;
     display:flex; align-items:center; gap:6px; transition: transform .15s, background .15s;
   }
-  .chip:active { transform: scale(.94); background: rgba(0,122,255,.12); }
+  .chip:active { transform: scale(.94); background: rgba(16,185,129,.12); }
   .chip .am { color: var(--blue); }
 
   /* Pavé numérique (tactiles) */
@@ -337,7 +337,7 @@
     border:0; cursor:pointer; font-family:inherit; font-size:22px; font-weight:700; color:var(--label);
     background:var(--fill); border-radius:12px; padding:14px 0; transition:transform .12s, background .12s;
   }
-  .keypad button:active { transform:scale(.93); background:rgba(0,122,255,.12); }
+  .keypad button:active { transform:scale(.93); background:rgba(16,185,129,.12); }
   /* Écrans tactiles : pavé maison, pas de clavier OS qui masque l'écran */
   @media (hover:none) and (pointer:coarse) {
     .keypad { display:grid; }
@@ -445,7 +445,7 @@
     border:0; cursor:pointer; font-family:inherit; font-size:20px; padding:8px 0;
     border-radius:10px; background: var(--fill); border:2px solid transparent; transition:all .15s;
   }
-  .emoji-cell.on { border-color: var(--blue); background: rgba(0,122,255,.1); }
+  .emoji-cell.on { border-color: var(--blue); background: rgba(16,185,129,.1); }
   .swatches { display:flex; flex-wrap:wrap; gap:9px; margin-top:8px; }
   .swatch {
     width:30px; height:30px; border-radius:50%; border:0; cursor:pointer; padding:0;
@@ -455,7 +455,7 @@
 
   /* Focus clavier : toujours visible (accessibilité) */
   button:focus-visible, [tabindex="0"]:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
-    outline: 3px solid rgba(0,122,255,.75); outline-offset: 2px; border-radius: 8px;
+    outline: 3px solid rgba(16,185,129,.75); outline-offset: 2px; border-radius: 8px;
   }
 
   /* ---------- Onboarding ---------- */
@@ -500,7 +500,7 @@
     background:var(--fill); font-family:inherit; font-size:16px; font-weight:700; color:var(--label);
     transition:all .15s;
   }
-  .ob-grid button.on { border-color:var(--blue); background:rgba(0,122,255,.1); }
+  .ob-grid button.on { border-color:var(--blue); background:rgba(16,185,129,.1); }
   .ob-split { display:flex; flex-direction:column; gap:8px; margin: 4px 0 18px; }
   .ob-split .env { padding:6px 0; }
   .ob-toggle-row {
@@ -640,7 +640,7 @@
   <div class="list-header"><span class="t">Mon profil</span></div>
   <div class="group">
     <div class="setrow">
-      <div class="icon-badge" style="background:rgba(0,122,255,.15)" id="avatar-set">👤</div>
+      <div class="icon-badge" style="background:rgba(16,185,129,.15)" id="avatar-set">👤</div>
       <div class="n">Mon prénom</div>
       <input id="user-name-input" aria-label="Mon prénom" type="text" maxlength="20"
              style="width:120px;padding:8px;text-align:right;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
@@ -651,7 +651,7 @@
       <div class="v" id="lang-current"></div>
     </div>
     <div class="setrow">
-      <div class="icon-badge" style="background:rgba(0,122,255,.15)">💱</div>
+      <div class="icon-badge" style="background:rgba(16,185,129,.15)">💱</div>
       <div class="n">Monnaie</div>
       <select id="currency-select" aria-label="Devise" style="padding:8px 12px;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
         <option value="€">Euro €</option>
@@ -705,7 +705,7 @@
       <div class="v" id="couple-last">jamais</div>
     </div>
     <div class="setrow" id="couple-import-row" style="display:none;cursor:pointer" onclick="document.getElementById('couple-file').click()" role="button" tabindex="0">
-      <div class="icon-badge" style="background:rgba(0,122,255,.15)">📥</div>
+      <div class="icon-badge" style="background:rgba(16,185,129,.15)">📥</div>
       <div class="n">Importer le fichier du partenaire</div>
       <div class="v">.json</div>
     </div>
@@ -1147,7 +1147,7 @@
   <h2>Passer sur un autre appareil</h2>
   <p class="hint" style="margin:6px 0 10px">Kola ne transmet rien du tout : tu passes par un fichier. La ligne rouge du 100% local reste intacte.</p>
   <div class="group">
-    <div class="setrow"><div class="icon-badge" style="background:rgba(0,122,255,.15)">1</div><div class="n">Ici : Réglages → Sauvegarde complète (JSON)</div></div>
+    <div class="setrow"><div class="icon-badge" style="background:rgba(16,185,129,.15)">1</div><div class="n">Ici : Réglages → Sauvegarde complète (JSON)</div></div>
     <div class="setrow"><div class="icon-badge" style="background:rgba(52,199,89,.15)">2</div><div class="n">Envoie le fichier par Mail, AirDrop ou WhatsApp</div></div>
     <div class="setrow"><div class="icon-badge" style="background:rgba(255,149,0,.15)">3</div><div class="n">Sur le nouvel appareil : Importer un fichier → choisis fusionner</div></div>
   </div>
@@ -1186,7 +1186,7 @@
   <h2>Exporter</h2>
   <div class="group">
     <div class="setrow" onclick="closeExportSheet(); exportBackup()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(0,122,255,.15)">💾</div>
+      <div class="icon-badge" style="background:rgba(16,185,129,.15)">💾</div>
       <div class="n">Sauvegarde complète (JSON)</div>
       <div class="v">tout</div>
     </div>
@@ -2498,7 +2498,7 @@ function renderCats(){
   });
   const add = document.createElement("div"); add.className = "setrow";
   add.setAttribute("role","button"); add.tabIndex = 0;
-  add.innerHTML = `<div class="icon-badge" style="background:rgba(0,122,255,.15)">➕</div>
+  add.innerHTML = `<div class="icon-badge" style="background:rgba(16,185,129,.15)">➕</div>
     <div class="n" style="color:var(--blue);font-weight:600">${t("Ajouter une catégorie")}</div>`;
   add.onclick = openCatSheet;
   host.appendChild(add);

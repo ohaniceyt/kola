@@ -531,6 +531,12 @@
   }
   .ob-grid button.on { border-color:var(--link); background:rgba(var(--accent-rgb),.1); }
   .ob-split { display:flex; flex-direction:column; gap:8px; margin: 4px 0 18px; }
+  .ob-books { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin: 8px 0 20px; }
+  .ob-chip {
+    display:inline-flex; align-items:center; gap:6px; padding:10px 16px; border-radius:20px;
+    background:var(--card); border:1.5px solid var(--separator); font-size:14px; font-weight:600;
+    color:var(--secondary-label);
+  }
   .ob-split .env { padding:6px 0; }
   .ob-toggle-row {
     display:flex; align-items:center; justify-content:space-between; gap:12px;
@@ -879,8 +885,21 @@
         <span class="ob-toggle-lbl">Créer ces enveloppes</span>
         <label class="switch"><input type="checkbox" id="ob-autosplit" checked><div class="trk"></div><div class="knb"></div></label>
       </div>
-      <button class="btn-primary" onclick="obFinish('pro')">🚀 C'est parti !</button>
+      <button class="btn-primary" onclick="obGo(5)">Continuer</button>
       <p class="hint">Tout reste modifiable plus tard dans Réglages.</p>
+    </div>
+
+    <!-- Étape 5 : Livres -->
+    <div class="ob-step" id="ob-step-5">
+      <h2 class="ob-title">Un livre par suivi</h2>
+      <p class="ob-sub">Sépare tes comptes : un livre Personnel, un pour la maison, un pour ton enfant… Bascule en un tap depuis l'accueil — et chaque livre peut avoir sa couleur.</p>
+      <div class="ob-books">
+        <div class="ob-chip">🪙 Personnel</div>
+        <div class="ob-chip">🏠 Maison</div>
+        <div class="ob-chip">🧒 Enfant</div>
+      </div>
+      <button class="btn-primary" onclick="obFinish('pro')">🚀 C'est parti !</button>
+      <p class="hint">Tu pourras en ajouter d'autres dans Réglages → Livres.</p>
     </div>
   </div>
 </div>
@@ -2088,6 +2107,13 @@ const I18N_EN = {
   "Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.":"Delete book “{a}” and its {n} expense(s)? This cannot be undone.",
   "{n} livre(s)":"{n} book(s)",
   "Renommer":"Rename",
+  "Un livre par suivi":"One book per ledger",
+  "Sépare tes comptes : un livre Personnel, un pour la maison, un pour ton enfant… Bascule en un tap depuis l'accueil — et chaque livre peut avoir sa couleur.":"Separate your ledgers: one Personal book, one for home, one for your child… Switch with one tap from Home — and each book can have its own color.",
+  "🪙 Personnel":"🪙 Personal",
+  "🏠 Maison":"🏠 Home",
+  "🧒 Enfant":"🧒 Child",
+  "C'est parti !":"Let's go!",
+  "Tu pourras en ajouter d'autres dans Réglages → Livres.":"You can add more later in Settings → Books.",
   "objectif(s)":"goal(s)",
   "récurrence(s)":"recurring expense(s)",
   "Aucune opération reconnaissable dans ce fichier":"No recognizable transactions in this file",
@@ -2821,8 +2847,8 @@ function renderCats(){
     // swipe iOS : à droite = Modifier, à gauche = Supprimer
     const wrap = document.createElement("div"); wrap.className = "swipe-wrap";
     wrap.innerHTML = `
-      <div class="swipe-actions" style="left:0"><button class="sw-btn edit" aria-label="Modifier la catégorie">✏️<span>Modifier</span></button></div>
-      <div class="swipe-actions" style="right:0"><button class="sw-btn del" aria-label="Supprimer la catégorie">🗑️<span>Supprimer</span></button></div>`;
+      <div class="swipe-actions" style="left:0"><button class="sw-btn edit" aria-label="${esc(t("Modifier la catégorie"))}">✏️<span>Modifier</span></button></div>
+      <div class="swipe-actions" style="right:0"><button class="sw-btn del" aria-label="${esc(t("Supprimer la catégorie"))}">🗑️<span>Supprimer</span></button></div>`;
     const front = document.createElement("div"); front.className = "swipe-front setrow";
     front.setAttribute("role","button"); front.tabIndex = 0;
     front.setAttribute("aria-label", tt(`Catégorie {a}, {b}, glisse à droite pour modifier, à gauche pour supprimer`, {a: c.label, b: count===1 ? t("1 dépense") : tt("{n} dépense(s)", {n: count})}));
@@ -4271,9 +4297,9 @@ function obGo(n){
   document.getElementById("ob-bud-cur").textContent = ob.currency;
   document.querySelectorAll(".ob-step").forEach((el,i)=>{ el.classList.toggle("on", i===n); el.setAttribute("aria-hidden", i===n?"false":"true"); });
   const dots = document.getElementById("ob-dots");
-  dots.innerHTML = [0,1,2,3,4].map(i=>`<div class="${i===n?"on":""}"></div>`).join("");
+  dots.innerHTML = [0,1,2,3,4,5].map(i=>`<div class="${i===n?"on":""}"></div>`).join("");
   dots.style.visibility = n===0 ? "hidden" : "visible";
-  document.getElementById("ob-skip").style.visibility = n===0 || n===4 ? "hidden" : "visible";
+  document.getElementById("ob-skip").style.visibility = n===0 || n===5 ? "hidden" : "visible";
   if (n===1) setTimeout(()=>document.getElementById("ob-name").focus(), 460);
   if (n===3){
     document.getElementById("ob-btn-budget").textContent =

@@ -254,6 +254,72 @@ eq(esc("<img src=x onerror=alert(1)>"), "&lt;img src=x onerror=alert(1)&gt;", "e
 eq(esc('"a\'&'), "&quot;a&#39;&amp;", "esc : guillemets + &");
 eq(esc(null), "", "esc : null → chaîne vide");
 
+/* ======== Livres (multi-suivis) ======== */
+const docStub = { getElementById: () => ({ classList: { contains: () => false } }) };
+const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", "t", "tt", "toast", "save", "render", "renderBookbar", "renderBooksRow", "document",
+  grab("/* ============ Livres (plusieurs suivis, un actif) ============ */", "function autoSplitBudget") +
+  "return { booksEnsure, bookStore, bookNew, bookSwitch, safeBookName, getBooks, curBook, bookDelete };")(
+  s, () => ({ other:{label:"Autre",emoji:"📦",color:"#8e8e93"} }), e => "📦", x => x, x => x, (k,o) => k, () => {}, () => {},
+  () => {}, () => {}, () => {}, docStub);
+
+/* Migration : état plat → un livre « Personnel » qui reprend les données + remontée à plat */
+{
+  const s = { budget: 50, expenses: [{ id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Test", cat:"food", amount:1, date:"2026-10-10", who:"me" }],
+              budgets: { food: 10 }, recurring: [], goals: [], cats: { food:{label:"Alimentation",emoji:"🍔",color:"#ff9500"} } };
+  makeBooks(s).booksEnsure();
+  const bs = s.books;
+  check(bs.length === 1 && bs[0].name === "Personnel" && bs[0].data.budget === 50
+        && Array.isArray(bs[0].data.expenses) && bs[0].data.expenses.length === 1
+        && s.expenses === bs[0].data.expenses && s.bookId === bs[0].id,
+        "livres : migration état plat → 1 livre, données reprises par référence, remontées à plat");
+  bs[0].data.expenses.push({ name:"x", amount:1, date:"2026-10-10" });
+  check(s.expenses.length === 2, "livres : tableau partagé en référence avec l'état");
+}
+
+/* Bascule de livre + normalisation des champs */
+{
+  const s = { budget: 0, expenses: [], budgets: {}, recurring: [], goals: [], cats: {} };
+  const F = makeBooks(s);
+  F.booksEnsure();
+  s.books.push({ id:"maison", name:"Maison", emoji:"🏠", data:{ budget:200, expenses:[{ name:"Loyer", cat:"other", amount:500, date:"2026-10-01" }], budgets:{}, recurring:[], goals:[], cats:{} } });
+  F.booksEnsure();
+  F.bookSwitch("maison");
+  check(s.bookId === "maison" && s.expenses.length === 1 && s.expenses[0].name === "Loyer" && s.budget === 200,
+        "livres : bookSwitch charge les données du livre");
+  // ids en double régénérés, champs manquants normalisés
+  s.books.push({ id:"maison", name:"<img src=x onerror=y>", data:{ expenses:"pas un tableau" } });
+  F.booksEnsure();
+  const ids = s.books.map(b=>b.id);
+  check(new Set(ids).size === ids.length && s.books[2].id !== "maison"
+        && !/[<>]/.test(s.books[2].name)
+        && Array.isArray(s.books[2].data.expenses) && s.books[2].data.expenses.length === 0,
+        "livres : id en double régénéré + nom hostile neutralisé + expenses normalisées");
+}
+
+/* buildBackup : livre à plat (format ancien) ne gagne PAS de clé books */
+const bakFlat = buildBackup({ expenses: [{ id:"aaaaaaaa-1111-4111-8111-000000000001", name:"x", cat:"food", amount:1, date:"2026-10-10" }], cats: { food:{ label:"Food", emoji:"🍔", color:"#ff9500" } } });
+check(!("books" in bakFlat) && !("bookId" in bakFlat), "buildBackup : format à plat → pas de clé books");
+
+/* buildBackup : multi-livres validé (nom/emoji hostiles, ids dupliqués, livre actif remonté) */
+const bakBooks = buildBackup({
+  v:3, budget: 999, bookId:"b1",
+  books: [
+    { id:"b1", name:"Perso", emoji:"🪙", data:{ budget:100, expenses:[{ name:"a", cat:"food", amount:1, date:"2026-10-10" }], budgets:{ food:10 }, cats:{ food:{ label:"Food", emoji:"🍔", color:"#ff9500" } } } },
+    { id:"b1", name:"<b>malin</b>", emoji:"<script>", data:{ expenses:[{ name:"b", cat:"other", amount:2, date:"2026-10-10" }] } },
+    { id:"<img>", name:"Corrompu", data:{ pas_de_expenses: true } }   // invalide : rejeté
+  ],
+  cats: { food:{ label:"Food", emoji:"🍔", color:"#ff9500" } }
+});
+check(Array.isArray(bakBooks.books) && bakBooks.books.length === 2
+      && new Set(bakBooks.books.map(b=>b.id)).size === 2
+      && bakBooks.bookId === "b1",
+      "buildBackup : livres validés (ids dédoublonnés, livre invalide rejeté, bookId défini)");
+check(bakBooks.expenses.length === 1 && bakBooks.budget === 100 && bakBooks.budgets.food === 10,
+      "buildBackup : livre actif remonté à plat (budget + dépenses)");
+const bakName = bakBooks.books.find(b=>b.id !== "b1");
+check(!/[<>]/.test(bakName.name) && bakName.emoji !== undefined && !/[<>/]/.test(bakName.emoji),
+      "buildBackup : nom de livre et emoji hostiles neutralisés");
+
 
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

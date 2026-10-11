@@ -458,6 +458,22 @@
     outline: 3px solid rgba(16,185,129,.75); outline-offset: 2px; border-radius: 8px;
   }
 
+  /* ---------- Livres (chips + sheet) ---------- */
+  .bookbar {
+    display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none;
+    padding: 10px 20px 4px; margin: 0; -webkit-overflow-scrolling:touch;
+  }
+  .bookbar::-webkit-scrollbar { display:none; }
+  .book-chip {
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:20px;
+    background:var(--card); border:1.5px solid transparent; font-family:inherit; font-size:14px; font-weight:600;
+    color:var(--secondary-label); cursor:pointer; white-space:nowrap; transition:all .15s;
+  }
+  .book-chip.on { background:rgba(16,185,129,.12); border-color:var(--blue); color:var(--blue); }
+  .book-chip .cnt { font-size:11px; font-weight:700; opacity:.65; }
+  .book-chip.add { border-style:dashed; }
+  .book-edit-row { display:flex; align-items:center; justify-content:flex-end; gap:4px; }
+
   /* ---------- Onboarding ---------- */
   .onboard {
     position:fixed; inset:0; z-index:60; background:var(--bg); display:none; overflow-y:auto;
@@ -524,6 +540,8 @@
       <button class="avatar" id="home-avatar" onclick="switchTab('settings')" aria-label="Mon profil">👤</button>
     </div>
   </div>
+
+  <div class="bookbar" id="bookbar"></div>
 
   <div class="hero">
     <div class="label" id="hero-label">Dépensé ce mois</div>
@@ -663,6 +681,17 @@
       </select>
     </div>
   </div>
+  <div class="list-header"><span class="t">Livres</span></div>
+  <div class="group">
+    <div class="setrow" onclick="openBookSheet()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(88,86,214,.15)">📚</div>
+      <div class="n">Livres
+        <div class="bk-sub">Personnel, maison, un enfant… un suivi par livre</div>
+      </div>
+      <div class="v" id="books-count"></div>
+      <div class="v chev">›</div>
+    </div>
+  </div>
   <div class="list-header"><span class="t">Budget</span></div>
   <div class="group">
     <div class="setrow">
@@ -769,7 +798,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.3</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.4</div></div>
   </div>
 </div>
 
@@ -1199,6 +1228,19 @@
   <button class="btn-ghost" onclick="closeExportSheet()" style="color:var(--secondary-label)">Annuler</button>
 </div>
 
+<div class="sheet" id="book-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="book-sheet-title">Livres</h2>
+  <div id="book-list"></div>
+  <div class="group" style="margin-top:2px">
+    <div class="setrow" onclick="bookEditNew()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(16,185,129,.15)">＋</div>
+      <div class="n" style="color:var(--blue);font-weight:600">Ajouter un livre</div>
+    </div>
+  </div>
+  <button class="btn-ghost" onclick="closeBookSheet()" style="color:var(--secondary-label)">Fermer</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1239,6 +1281,7 @@ function stateInit(raw){
   // Migration : les profils existants (données présentes) sautent l'onboarding
   if (state.onboarded === undefined) { state.onboarded = !!(raw && state.expenses.length); }
   if (raw && state.expenses.length) { processRecurring(); }   // pas de seed ici : l'onboarding décide
+  booksEnsure();   // migration multi-livres : l'état plat devient le livre « Personnel »
 }
 
 /* load() : choisit la copie la plus récente (localStorage ⇄ IndexedDB) puis initialise */
@@ -1283,6 +1326,172 @@ function catDefaults(){
   }
   return JSON.parse(JSON.stringify(CATS));
 }
+/* ============ Livres (plusieurs suivis, un actif) ============ */
+/* Exemples : 1 livre Personnel, 1 pour un enfant, 1 pour la maison.
+   Chaque livre porte ses propres dépenses/budgets/enveloppes/objectifs/récurrences
+   et ses catégories ; le reste (profil, monnaie, couple, langue) reste global.
+   Le livre courant est remonté dans `state` (champs à plat) : tout le code
+   existant (stats, historique, vues, couple) lit l'état à plat sans le savoir. */
+const BOOK_FIELDS = ["budget","expenses","budgets","recurring","goals","cats"];
+const SAFE_BOOK_ID = /^[a-z0-9-]{1,24}$/i;
+function safeBookName(n){
+  return String(n ?? "").replace(/[<>&"'`\\{}]/g, "").slice(0, 40).trim() || "Livre";
+}
+function getBooks(){ return Array.isArray(state.books) ? state.books.filter(b => b && typeof b === "object") : []; }
+let bookSeq = 0;
+function bookNew(name, emoji, id){
+  if (!id || !SAFE_BOOK_ID.test(id)) id = "b" + Date.now().toString(36) + (+(bookSeq++) + Math.floor(Math.random()*36)).toString(36);
+  return { id, name: safeBookName(name), emoji: safeEmoji(emoji || "📖"),
+           data: { budget: 0, expenses: [], budgets: {}, recurring: [], goals: [], cats: catDefaults() } };
+}
+function curBook(){
+  const bs = getBooks();
+  return bs.find(b => b.id === state.bookId) || bs[0];
+}
+/* booksEnsure : migration (état plat → 1 livre) + normalisation + remontée du livre courant */
+function booksEnsure(){
+  const catsOk = c => c && typeof c === "object" && !Array.isArray(c) && Object.keys(c).length;
+  if (!getBooks().length){
+    // Les données existantes (état plat d'avant les livres) deviennent le premier livre
+    state.books = [{ id: "b1", name: "Personnel", emoji: "🪙",
+      data: { budget: +state.budget || 0,
+              expenses: Array.isArray(state.expenses) ? state.expenses : [],
+              budgets: (state.budgets && typeof state.budgets === "object" && !Array.isArray(state.budgets)) ? state.budgets : {},
+              recurring: Array.isArray(state.recurring) ? state.recurring : [],
+              goals: Array.isArray(state.goals) ? state.goals : [],
+              cats: catsOk(state.cats) ? state.cats : catDefaults() } }];
+  }
+  const seen = new Set();
+  state.books = state.books.filter(b => b && typeof b === "object").map(b => {
+    if (!b.id || !SAFE_BOOK_ID.test(b.id) || seen.has(b.id)) b.id = bookNew(b.name, b.emoji).id;
+    seen.add(b.id);
+    b.name = safeBookName(b.name);
+    b.emoji = safeEmoji(b.emoji || "📖");
+    // tolère un livre arrivé sans objet `data` (ancien format intermédiaire)
+    if (!b.data || typeof b.data !== "object" || Array.isArray(b.data)) b.data = {};
+    b.data.budget = +b.data.budget || 0;
+    if (!Array.isArray(b.data.expenses)) b.data.expenses = [];
+    if (!b.data.budgets || typeof b.data.budgets !== "object" || Array.isArray(b.data.budgets)) b.data.budgets = {};
+    if (!Array.isArray(b.data.recurring)) b.data.recurring = [];
+    if (!Array.isArray(b.data.goals)) b.data.goals = [];
+    if (!catsOk(b.data.cats)) b.data.cats = catDefaults();
+    return b;
+  });
+  if (!state.bookId || !seen.has(state.bookId)) state.bookId = state.books[0].id;
+  const c = curBook();
+  BOOK_FIELDS.forEach(f => { state[f] = c.data[f]; });
+}
+/* bookStore : recopie les champs à plat du livre courant dans state.books (avant bascule) */
+function bookStore(){
+  const b = curBook(); if (!b) return;
+  b.data = { budget: +state.budget || 0, expenses: state.expenses, budgets: state.budgets,
+             recurring: state.recurring, goals: state.goals, cats: state.cats };
+}
+function bookSwitch(id){
+  const b = getBooks().find(x => x.id === id);
+  if (!b || id === state.bookId) return;
+  bookStore();
+  state.bookId = id;
+  BOOK_FIELDS.forEach(f => { state[f] = b.data[f]; });
+  save(); render(); renderBookbar(); renderBooksRow();
+  if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
+  toast(b.emoji + " " + b.name);
+}
+function bookAdd(name, emoji){
+  bookStore();
+  const b = bookNew(name, emoji);
+  state.books.push(b);
+  state.bookId = b.id;
+  BOOK_FIELDS.forEach(f => { state[f] = b.data[f]; });
+  save(); render(); renderBookbar(); renderBooksRow();
+  if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
+  toast(b.emoji + " " + b.name);
+}
+function bookRename(id, name, emoji){
+  const b = getBooks().find(x => x.id === id); if (!b) return;
+  b.name = safeBookName(name);
+  b.emoji = safeEmoji(emoji || b.emoji);
+  save(); render(); renderBookbar(); renderBooksRow();
+  if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
+}
+function bookDelete(id){
+  if (getBooks().length <= 1) return;
+  const idx = state.books.findIndex(b => b.id === id); if (idx < 0) return;
+  const gone = state.books[idx];
+  state.books.splice(idx, 1);
+  if (state.bookId === id){
+    state.bookId = state.books[0].id;
+    BOOK_FIELDS.forEach(f => { state[f] = state.books[0].data[f]; });
+  }
+  save(); render(); renderBookbar(); renderBooksRow();
+  if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
+  toast(tt("🗑️ Livre « {a} » supprimé", { a: gone.name }));
+}
+function renderBookbar(){
+  const bar = document.getElementById("bookbar"); if (!bar) return;
+  bar.innerHTML = getBooks().map(b =>
+    `<button class="book-chip${b.id === state.bookId ? " on" : ""}" onclick="bookSwitch('${b.id}')" aria-label="${esc(b.name)}">${esc(b.emoji)} ${esc(b.name)} <span class="cnt">${(b.data.expenses || []).length}</span></button>`
+  ).join("") + `<button class="book-chip add" onclick="openBookSheet()" aria-label="${esc(t("Modifier les livres"))}">＋ ${esc(t("Livres"))}</button>`;
+}
+function renderBooksRow(){
+  const el = document.getElementById("books-count"); if (!el) return;
+  const b = curBook();
+  el.textContent = `${getBooks().length} · ${b ? b.name : ""}`;
+}
+/* --- Sheet de gestion des livres --- */
+let bookEditId = null;   // id en cours d'édition, ou "new"
+function openBookSheet(){ bookEditId = null; document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("book-sheet").classList.add("show"); syncScrollLock(); renderBookSheet(); }
+function closeBookSheet(){ const s = document.getElementById("book-sheet");
+  if (s){ s.classList.remove("show"); clearSheetOverlay(); } }
+function renderBookSheet(){
+  const list = document.getElementById("book-list"); if (!list) return;
+  const editRow = (name, emoji) => `<div class="group" style="padding:8px 0">
+    <div class="setrow" style="align-items:center">
+      <input id="be-emoji" aria-label="Emoji du livre" type="text" maxlength="4" value="${esc(emoji)}"
+             style="width:52px;padding:8px;text-align:center;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:17px;outline:none">
+      <input id="be-name" aria-label="${esc(t("Nom du livre"))}" type="text" maxlength="40" value="${esc(name)}"
+             style="flex:1;padding:8px;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none" placeholder="${esc(t("Nom du livre"))}">
+    </div>
+    <div class="setrow">
+      <button class="btn-ghost" onclick="bookEditSave()" style="color:var(--blue);font-weight:700">✓ ${esc(t("Enregistrer"))}</button>
+      <button class="btn-ghost" onclick="bookEditCancel()" style="color:var(--secondary-label)">${esc(t("Annuler"))}</button>
+    </div>
+  </div>`;
+  const editNew = bookEditId === "new" ? editRow("", "📖") : "";
+  const rows = getBooks().map(b => {
+    if (b.id === bookEditId) return editRow(b.name, b.emoji);
+    const n = (b.data.expenses || []).length;
+    const trash = getBooks().length > 1 ? `<div class="v chev" onclick="event.stopPropagation();bookAskDelete('${b.id}')" role="button" tabindex="0">🗑️</div>` : "";
+    return `<div class="setrow" style="cursor:pointer" onclick="bookSwitch('${b.id}')" role="button" tabindex="0">
+      <div class="icon-badge" style="font-size:18px;background:var(--fill)">${esc(b.emoji)}</div>
+      <div class="n">${esc(b.name)}${b.id === state.bookId ? ` <div class="bk-sub">${esc(t("Livre actuel"))}</div>` : ""}</div>
+      <div class="v">${tt("{n} dépense(s)", { n })}</div>
+      <div class="v chev" onclick="event.stopPropagation();bookSwitchEdit('${b.id}')" role="button" tabindex="0">✏️</div>
+      ${trash}
+    </div>`;
+  }).join("");
+  list.innerHTML = editNew + `<div class="group">${rows}</div>
+    <div class="hint" style="padding:8px 20px 2px">${esc(t("Chaque livre a ses dépenses, enveloppes et objectifs — bascule en un tap depuis l'accueil."))}</div>`;
+}
+function bookSwitchEdit(id){ if (bookEditId === id){ bookEditId = null; renderBookSheet(); return; }
+  bookEditId = id; renderBookSheet();
+  const el = document.getElementById("be-name"); if (el) el.focus(); }
+function bookEditNew(){ if (bookEditId === "new") return; bookEditId = "new"; renderBookSheet();
+  const el = document.getElementById("be-name"); if (el) el.focus(); }
+function bookEditSave(){
+  const n = (document.getElementById("be-name") || {}).value ?? "";
+  const e = (document.getElementById("be-emoji") || {}).value ?? "";
+  if (!String(n).trim()){ toast(t("Nom du livre")); return; }
+  if (bookEditId === "new") bookAdd(n, e); else bookRename(bookEditId, n, e);
+  bookEditId = null;
+}
+function bookEditCancel(){ bookEditId = null; renderBookSheet(); }
+function bookAskDelete(id){
+  const b = getBooks().find(x => x.id === id); if (!b || getBooks().length <= 1) return;
+  if (confirm(tt("Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.", { a: b.name, n: (b.data.expenses || []).length }))) bookDelete(id);
+}
+
 function autoSplitBudget(){
   state.budgets = {};
   Object.keys(state.cats).forEach(k=>{
@@ -1292,6 +1501,7 @@ function autoSplitBudget(){
   });
 }
 function save(){
+  if (Array.isArray(state.books)) bookStore();   // le livre courant reste synchronisé avant chaque écriture
   state.rev = (+state.rev || 0) + 1;   // compteur monotone : arbitre entre les 2 copies
   let lsOk = false;
   try {
@@ -1750,6 +1960,20 @@ const I18N_EN = {
   "guide":"guide",
   "OK":"OK",
   "Aucun doublon à la fusion":"No duplicates on merge",
+  /* --- Livres --- */
+  "Livres":"Books",
+  "Livres de suivi":"Tracking books",
+  "Personnel, maison, un enfant… un suivi par livre":"Personal, home, a child… one ledger per book",
+  "Ajouter un livre":"Add a book",
+  "Chaque livre a ses dépenses, enveloppes et objectifs — bascule en un tap depuis l'accueil.":"Each book has its own expenses, envelopes and goals — switch with one tap from Home.",
+  "Nouveau livre":"New book",
+  "Nom du livre":"Book name",
+  "Emoji du livre":"Book emoji",
+  "Livre actuel":"Current book",
+  "Modifier les livres":"Edit books",
+  "🗑️ Livre « {a} » supprimé":"🗑️ Book “{a}” deleted",
+  "Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.":"Delete book “{a}” and its {n} expense(s)? This cannot be undone.",
+  "{n} livre(s)":"{n} book(s)",
   "objectif(s)":"goal(s)",
   "récurrence(s)":"recurring expense(s)",
   "Aucune opération reconnaissable dans ce fichier":"No recognizable transactions in this file",
@@ -3033,8 +3257,10 @@ function safeEmoji(e){
   return s.slice(0, 8) || "📦";
 }
 const safeColor = c => (typeof c === "string" && SAFE_COLOR.test(c)) ? c : "#8e8e93";
-function buildBackup(s){
-  if (!s || !Array.isArray(s.expenses)) throw new Error("format");
+/* Validation des champs d'un livre unique (dépenses, enveloppes, objectifs…)
+   — réutilisée par buildBackup pour le format à plat (ancien) et les livres. */
+function buildLedger(s){
+  if (!s || typeof s !== "object" || !Array.isArray(s.expenses)) throw new Error("format");
   // Clés de catégories : les clés non conformes sont réinventées (impXXXXXXXX)
   // et TOUTES les références (dépenses, budgets, récurrences) sont re-mappées.
   const keyMap = {};
@@ -3061,24 +3287,73 @@ function buildBackup(s){
     });
   }
   return {
-    v: SCHEMA_VERSION,
-    rev: +s.rev || 0,   // ⚠️ conservé : sans lui, la copie IndexedDB de l'appareil (rev plus haute) écraserait le fichier restauré au prochain boot
-    deviceId: (typeof s.deviceId === "string" && SAFE_UUID.test(s.deviceId)) ? s.deviceId : undefined,
     budget: +s.budget || 0,
-    currency: s.currency || "€",
-    onboarded: true,
     cats: catsOut,
     budgets: budgetsOut,
     recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat: knownCat(r.cat) || "other", amount:+r.amount, freq:(r.freq||"m"), wd:+r.wd||0, day:Math.min(Math.max(+r.day||1,1),28), lastAdded: SAFE_DATE.test(r.lastAdded||"") ? r.lastAdded : "" })) : [],
     goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:safeId(g.id), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
-    user: { name: String((s.user && s.user.name) || "").slice(0,20) },
-    couple: (s.couple && typeof s.couple === "object") ? {
-      on: !!s.couple.on,
-      partner: String(s.couple.partner || "").slice(0,20),
-      sentIds: Array.isArray(s.couple.sentIds) ? s.couple.sentIds.filter(x=>SAFE_UUID.test(x)).slice(0,2000) : [],
-      lastAt: SAFE_DATE.test(s.couple.lastAt || "") ? s.couple.lastAt : ""
-    } : null,
     expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date, who: (e.who==="partner" || e.who==="shared") ? e.who : "me", ts: (+e.ts && +e.ts > 1e12 && +e.ts < 9e15) ? +e.ts : 0}))
+  };
+}
+function buildBackup(s){
+  if (!s || typeof s !== "object") throw new Error("format");
+  const user = { name: String((s.user && s.user.name) || "").slice(0,20) };
+  const couple = (s.couple && typeof s.couple === "object") ? {
+    on: !!s.couple.on,
+    partner: String(s.couple.partner || "").slice(0,20),
+    sentIds: Array.isArray(s.couple.sentIds) ? s.couple.sentIds.filter(x=>SAFE_UUID.test(x)).slice(0,2000) : [],
+    lastAt: SAFE_DATE.test(s.couple.lastAt || "") ? s.couple.lastAt : ""
+  } : null;
+  // Livres : chaque livre est validé par buildLedger (anti-injection identique)
+  const booksIn = Array.isArray(s.books) ? s.books.filter(b =>
+    b && typeof b === "object" && (() => { const d = (b.data && typeof b.data === "object" && !Array.isArray(b.data)) ? b.data : b; return Array.isArray(d.expenses); })()
+  ) : null;
+  if (booksIn && booksIn.length){
+    const bkBookId = id => (typeof id === "string" && /^[a-z0-9-]{1,24}$/i.test(id)) ? id : null;
+    const bkName = n => String(n ?? "").replace(/[<>&"'`\\{}]/g, "").slice(0, 40).trim() || "Livre";
+    const seen = new Set();
+    const booksOut = booksIn.map(b => {
+      const d = (b.data && typeof b.data === "object" && !Array.isArray(b.data)) ? b.data : b;
+      let id = bkBookId(b.id);
+      if (!id || seen.has(id)) id = "b" + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+      seen.add(id);
+      return { id, name: bkName(b.name), emoji: safeEmoji(b.emoji || "📖"), data: buildLedger(d) };
+    });
+    const act = booksOut.find(b => b.id === s.bookId) || booksOut[0];
+    return {
+      v: SCHEMA_VERSION,
+      rev: +s.rev || 0,   // ⚠️ conservé : sans lui, la copie IndexedDB de l'appareil (rev plus haute) écraserait le fichier restauré au prochain boot
+      deviceId: (typeof s.deviceId === "string" && SAFE_UUID.test(s.deviceId)) ? s.deviceId : undefined,
+      currency: s.currency || "€",
+      onboarded: true,
+      books: booksOut,
+      bookId: act.id,
+      user, couple,
+      // Livre actif remonté à plat (compat : l'ancienne logique de fusion/rendu lit ces champs)
+      budget: act.data.budget,
+      cats: act.data.cats,
+      budgets: act.data.budgets,
+      recurring: act.data.recurring,
+      goals: act.data.goals,
+      expenses: act.data.expenses
+    };
+  }
+  // Format à plat (sauvegardes d'avant les livres)
+  const led = buildLedger(s);
+  return {
+    v: SCHEMA_VERSION,
+    rev: +s.rev || 0,
+    deviceId: (typeof s.deviceId === "string" && SAFE_UUID.test(s.deviceId)) ? s.deviceId : undefined,
+    budget: led.budget,
+    currency: s.currency || "€",
+    onboarded: true,
+    cats: led.cats,
+    budgets: led.budgets,
+    recurring: led.recurring,
+    goals: led.goals,
+    user,
+    couple,
+    expenses: led.expenses
   };
 }
 let backupPending = null;
@@ -3117,7 +3392,7 @@ function openBackupSheet(bk){
   document.getElementById("backup-title").textContent = t("Restaurer une sauvegarde");
   document.getElementById("backup-preview").innerHTML =
     `<div class="empty" style="padding:4px 0 6px">
-      📂 ${bk.exportedAt ? esc(tt("Sauvegarde du {d} · ", {d: bk.exportedAt})) : ""}${tt("{n} dépense(s)", {n: bk.expenses.length})} · ${(bk.goals||[]).length} ${t("objectif(s)")} · ${(bk.recurring||[]).length} ${t("récurrence(s)")}
+      📂 ${bk.exportedAt ? esc(tt("Sauvegarde du {d} · ", {d: bk.exportedAt})) : ""}${tt("{n} dépense(s)", {n: bk.expenses.length})}${Array.isArray(bk.books) && bk.books.length ? " · " + tt("{n} livre(s)", {n: bk.books.length}) : ""} · ${(bk.goals||[]).length} ${t("objectif(s)")} · ${(bk.recurring||[]).length} ${t("récurrence(s)")}
       ${bk.currency !== state.currency ? "<br>⚠️ " + tt("Devise du fichier : {a} (cette devise ici : {b})", {a: esc(bk.currency||"—"), b: state.currency}) : ""}
       <br><b>${dups ? tt("{n} doublon(s) ignoré(s) à la fusion", {n: dups}) : t("Aucun doublon à la fusion")}</b>
       ${cur ? "" : "<br>" + esc(tt("Fichier de {a} — nom adopté", {a: (bk.user.name||"—")}))}
@@ -3660,25 +3935,50 @@ function closeBackupSheet(){
   clearSheetOverlay();
   backupPending = null;
 }
+/* Fusion dédoublonnée d'un ledger (dépenses, cats, enveloppes, objectifs, récurrences)
+   dans une destination à plat — utilisée par le merge simple et le merge par livre. */
+function mergeLedgerInto(dst, src){
+  let added = 0;
+  const key = e => e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100);
+  const have = new Set(dst.expenses.map(key));
+  src.expenses.forEach(e=>{ const k = key(e); if (!have.has(k)){ dst.expenses.push(e); have.add(k); added++; } });
+  Object.entries(src.cats||{}).forEach(([k,c])=>{ if (!dst.cats[k]) dst.cats[k] = c; });
+  Object.entries(src.budgets||{}).forEach(([k,v])=>{ if (dst.budgets[k] === undefined && dst.cats[k]) dst.budgets[k] = +v; });
+  (src.goals||[]).forEach(g=>{
+    const mine = (dst.goals||[]).find(x=>x.id === g.id);
+    if (!mine) dst.goals.push(g);
+    else if (g.saved > mine.saved) mine.saved = g.saved;   // progression cumulée max
+  });
+  (src.recurring||[]).forEach(r=>{
+    const mine = (dst.recurring||[]).find(x=>x.name===r.name && x.cat===r.cat && x.freq===(r.freq||"m") && Math.abs(x.amount-r.amount)<0.005);
+    if (!mine) dst.recurring.push(r);
+    else if (r.lastAdded && r.lastAdded > (mine.lastAdded||"")) mine.lastAdded = r.lastAdded;
+  });
+  return added;
+}
 function applyBackupMerge(){
   const bk = backupPending; if (!bk) return;
   let added = 0;
-  const key = e => e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100);
-  const have = new Set(state.expenses.map(key));
-  bk.expenses.forEach(e=>{ const k = key(e); if (!have.has(k)){ state.expenses.push(e); have.add(k); added++; } });
-  Object.entries(bk.cats||{}).forEach(([k,c])=>{ if (!state.cats[k]) state.cats[k] = c; });
-  Object.entries(bk.budgets||{}).forEach(([k,v])=>{ if (state.budgets[k] === undefined && state.cats[k]) state.budgets[k] = +v; });
-  (bk.goals||[]).forEach(g=>{
-    const mine = (state.goals||[]).find(x=>x.id === g.id);
-    if (!mine) state.goals.push(g);
-    else if (g.saved > mine.saved) mine.saved = g.saved;   // progression cumulée max
-  });
-  (bk.recurring||[]).forEach(r=>{
-    const mine = (state.recurring||[]).find(x=>x.name===r.name && x.cat===r.cat && x.freq===(r.freq||"m") && Math.abs(x.amount-r.amount)<0.005);
-    if (!mine) state.recurring.push(r);
-    else if (r.lastAdded && r.lastAdded > (mine.lastAdded||"")) mine.lastAdded = r.lastAdded;
-  });
-  if (!state.budget && bk.budget) state.budget = bk.budget;
+  if (Array.isArray(bk.books) && bk.books.length){
+    // Fichier multi-livres : fusion par id (sinon par nom, sinon nouveau livre)
+    bk.books.forEach(sb=>{
+      const data = sb.data || sb;
+      const mine = state.books.find(x=>x.id===sb.id) || state.books.find(x=>x.name===sb.name);
+      if (mine){
+        added += mergeLedgerInto(mine.data, data);
+        if (!+mine.data.budget && +data.budget) mine.data.budget = +data.budget;
+      } else {
+        state.books.push({ id: sb.id, name: sb.name, emoji: sb.emoji,
+          data: { budget:+data.budget||0, expenses:(data.expenses||[]).slice(), budgets:{...(data.budgets||{})},
+                  recurring:(data.recurring||[]).slice(), goals:(data.goals||[]).map(g=>({...g})), cats:{...(data.cats||{})} } });
+        added += (data.expenses||[]).length;
+      }
+    });
+  } else {
+    // Fichier à plat (ancien format) : fusion dans le livre courant
+    added = mergeLedgerInto({ expenses: state.expenses, cats: state.cats, budgets: state.budgets, goals: state.goals, recurring: state.recurring }, bk);
+    if (!state.budget && bk.budget) state.budget = bk.budget;
+  }
   if (!state.user.name && bk.user.name) state.user.name = bk.user.name;
   if (bk.couple){
     if (!state.couple || typeof state.couple !== "object") state.couple = { on:false, partner:"", sentIds:[], lastAt:"" };
@@ -3691,22 +3991,26 @@ function applyBackupMerge(){
   }
   state.lastBackupAt = ymd(new Date());
   closeBackupSheet();
-  save(); renderHistFilter(); switchTab("home"); render();
+  save(); renderHistFilter(); switchTab("home"); render(); renderBookbar(); renderBooksRow();
   toast(tt("📥 {n} dépense(s) ajoutée(s) par fusion", {n: added}));
 }
 function applyBackupReplace(){
   const bk = backupPending; if (!bk) return;
-  if (!confirm(tt("Remplacer TOUTES les données de cet appareil par le fichier ({n} dépense(s)) ?", {n: bk.expenses.length}))) return;
+  const totalExp = Array.isArray(bk.books)
+    ? bk.books.reduce((n,b)=>n + ((b.data||b).expenses||[]).length, 0)
+    : bk.expenses.length;
+  if (!confirm(tt("Remplacer TOUTES les données de cet appareil par le fichier ({n} dépense(s)) ?", {n: totalExp}))) return;
   const ownRev = +state.rev || 0;       // rev locale (au moins celle de la copie IDB, sinon l'IDB écraserait le remplacement au boot suivant)
   // Préférences locales conservées : le fichier ne les référence pas
   const keep = { lang: state.lang, legendMode: state.legendMode, eveningSeen: state.eveningSeen };
   state = bk;
   Object.assign(state, keep);
+  booksEnsure();                        // normalise les livres et remonte le livre actif à plat
   state.rev = Math.max(ownRev, +bk.rev || 0);
   state.lastBackupAt = ymd(new Date());
   closeBackupSheet();
-  save(); renderHistFilter(); switchTab("home"); render();
-  toast(tt("📥 {n} dépense(s) importée(s)", {n: bk.expenses.length}));
+  save(); renderHistFilter(); switchTab("home"); render(); renderBookbar(); renderBooksRow();
+  toast(tt("📥 {n} dépense(s) importée(s)", {n: totalExp}));
 }
 function installPWA(){
   if (!deferredPrompt){ toast("iPhone : Partager → « Sur l'écran d'accueil »"); return; }
@@ -3922,6 +4226,7 @@ function resetAll(){
 function render(){
   updateGreeting();
   renderLangRow();
+  renderBookbar(); renderBooksRow();
   document.getElementById("set-cur").textContent = state.currency;
   if (document.getElementById("page-home").classList.contains("active")) renderHome();
   else if (document.getElementById("page-stats").classList.contains("active")) {

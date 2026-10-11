@@ -481,6 +481,21 @@
     text-shadow:0 1px 2px rgba(0,0,0,.25); transition:all .15s;
   }
   .theme-swatch.on { border-color:var(--label); box-shadow:0 0 0 3px var(--fill); }
+  /* ---------- Bannière d'installation iOS ---------- */
+  .pwa-i {
+    position:fixed; left:12px; right:12px; bottom:calc(78px + env(safe-area-inset-bottom)); z-index:30;
+    max-width:480px; margin:0 auto; padding:12px 14px; border-radius:16px;
+    background:var(--bg-elevated); box-shadow:0 10px 34px rgba(0,0,0,.22);
+    display:none; align-items:flex-start; gap:12px;
+  }
+  .pwa-i.show { display:flex; animation: fadeIn .4s ease; }
+  .pwa-i img { width:46px; height:46px; border-radius:12px; flex-shrink:0; }
+  .pwa-t { font-size:15px; font-weight:700; }
+  .pwa-d { font-size:13px; color:var(--secondary-label); line-height:1.45; margin-top:2px; }
+  .pwa-x {
+    border:0; background:var(--fill); width:36px; height:36px; border-radius:18px; flex-shrink:0;
+    color:var(--secondary-label); font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
   .lg h3 { font-size:15px; font-weight:700; margin:16px 0 4px; }
   .lg p { font-size:14px; color:var(--secondary-label); line-height:1.55; margin:4px 0 10px; word-break:break-word; }
   .lg p a { color:var(--link); font-weight:600; text-decoration:none; }
@@ -1322,6 +1337,15 @@
   <h2 id="legal-sheet-title">Mentions légales</h2>
   <div class="lg" id="legal-body"></div>
   <button class="btn-ghost" onclick="closeLegalSheet()" style="color:var(--secondary-label)">Fermer</button>
+</div>
+
+<div class="pwa-i" id="pwa-banner">
+  <img src="icons/icon-192.png" alt="Kola" aria-hidden="true">
+  <div style="flex:1;min-width:0">
+    <div class="pwa-t">Installe l'app</div>
+    <div class="pwa-d">iPhone : bouton Partager ↓ → « Sur l'écran d'accueil ». Tu l'auras en plein écran, hors ligne, comme une vraie appli.</div>
+  </div>
+  <button class="pwa-x" onclick="dismissPwaBanner()" aria-label="Plus tard">✕</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -2207,6 +2231,8 @@ const I18N_EN = {
   "Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.":"Delete book “{a}” and its {n} expense(s)? This cannot be undone.",
   "{n} livre(s)":"{n} book(s)",
   "Renommer":"Rename",
+  "Installe l'app":"Install the app",
+  "iPhone : bouton Partager ↓ → « Sur l'écran d'accueil ». Tu l'auras en plein écran, hors ligne, comme une vraie appli.":"iPhone: Share button ↓ → “Add to Home Screen”. You'll get it full screen, offline, like a real app.",
   /* --- Légal --- */
   "Légal":"Legal",
   "Mentions légales":"Legal notices",
@@ -4445,6 +4471,7 @@ function obFinish(mode, skipped){
   state.onboarded = true;
   save();
   document.getElementById("onboard").classList.remove("show");
+  setTimeout(checkInstallBanner, 1200);
   switchTab("home");
   render();
   toast(state.user.name ? tt("👋 Bienvenue, {a} !", {a: state.user.name}) : t("👋 Bienvenue dans Kola !"));
@@ -4933,9 +4960,37 @@ applyI18n();
 __i18nObs.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder","aria-label","title"] });
 render();
 if (!state.onboarded) showOnboarding();
-else setTimeout(showEveningView, 700);   // le soir venu : résumé du jour (une fois par soir)
+else setTimeout(showEveningView, 700);
+setTimeout(checkInstallBanner, 1200);   // bannière d'install iOS (hors onboarding)
 })().catch(err => { console.error("Kola : échec de l'init", err); toast("⚠️ Erreur au démarrage"); });
 /* (le bloc PWA, ci-dessous, n'a pas besoin de state : il reste hors du IIFE async) */
+
+function isIOSDevice(){
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // iPadOS 13+ se fait passer pour un Mac : détecté par écran tactile
+  return /Mac/.test(ua) && (("ontouchstart" in window) || (navigator.maxTouchPoints || 0) > 1);
+}
+function isStandalone(){
+  return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+}
+/* Bannière iOS : iOS ne propose pas de prompt d'installation natif (pas de beforeinstallprompt),
+   on guide donc l'utilisateur vers Partager → « Sur l'écran d'accueil ». Réapparait à chaque
+   session tant que l'app n'est pas installée (fermable au tap, mémorisé pour la session seule). */
+function checkInstallBanner(){
+  const el = document.getElementById("pwa-banner");
+  if (!el) return;
+  const onboardingOpen = document.getElementById("onboard").classList.contains("show");
+  const ok = isIOSDevice() && !isStandalone() && !onboardingOpen
+             && typeof sessionStorage !== "undefined" && !sessionStorage.getItem("pwa-dismissed");
+  el.classList.toggle("show", ok);
+}
+function dismissPwaBanner(){
+  try { sessionStorage.setItem("pwa-dismissed", "1"); } catch(_){}
+  const el = document.getElementById("pwa-banner"); if (el) el.classList.remove("show");
+}
+
+
 
 /* ============ PWA ============ */
 if ("serviceWorker" in navigator && location.protocol === "https:") {

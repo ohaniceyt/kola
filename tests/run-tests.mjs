@@ -255,7 +255,8 @@ eq(esc('"a\'&'), "&quot;a&#39;&amp;", "esc : guillemets + &");
 eq(esc(null), "", "esc : null → chaîne vide");
 
 /* ======== Livres (multi-suivis) ======== */
-const docStub = { getElementById: () => ({ classList: { contains: () => false } }) };
+const docStub = { getElementById: () => ({ classList: { contains: () => false } }),
+  documentElement: { style: { setProperty: () => {} } }, querySelectorAll: () => [] };
 const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", "t", "tt", "toast", "save", "render", "renderBookbar", "renderBooksRow", "document",
   grab("/* ============ Livres (plusieurs suivis, un actif) ============ */", "function autoSplitBudget") +
   "return { booksEnsure, bookStore, bookNew, bookSwitch, safeBookName, getBooks, curBook, bookDelete };")(
@@ -319,6 +320,24 @@ check(bakBooks.expenses.length === 1 && bakBooks.budget === 100 && bakBooks.budg
 const bakName = bakBooks.books.find(b=>b.id !== "b1");
 check(!/[<>]/.test(bakName.name) && bakName.emoji !== undefined && !/[<>/]/.test(bakName.emoji),
       "buildBackup : nom de livre et emoji hostiles neutralisés");
+
+/* ======== Thème ======== */
+const bakTheme = buildBackup({ expenses:[{ id:"aaaaaaaa-1111-4111-8111-000000000001", name:"x", cat:"food", amount:1, date:"2026-10-10" }], cats:{ food:{ label:"Food", emoji:"🍔", color:"#ff9500" } }, theme:"rose" });
+check(bakTheme.theme === "rose", "buildBackup : thème global validé (id palette)");
+const bakThemeBad = buildBackup({ expenses:[{ id:"aaaaaaaa-1111-4111-8111-000000000001", name:"x", cat:"food", amount:1, date:"2026-10-10" }], cats:{ food:{ label:"Food", emoji:"🍔", color:"#ff9500" } }, theme:"<script>alert(1)</script>" });
+check(!bakThemeBad.theme, "buildBackup : thème invalide → absent (undefined)");
+const bakBooksTheme = buildBackup({
+  v:3, bookId:"b1",
+  books: [
+    { id:"b1", name:"Perso", theme:"blue", data:{ expenses:[{ name:"a", cat:"food", amount:1, date:"2026-10-10" }] } },
+    { id:"b2", name:"Maison", theme:"<img>", data:{ expenses:[] } }
+  ],
+  cats: { food:{ label:"Food", emoji:"🍔", color:"#ff9500" } }
+});
+check(bakBooksTheme.books.find(b=>b.id==="b1").theme === "blue"
+      && !bakBooksTheme.books.find(b=>b.id==="b2").theme
+      && bakBooksTheme.theme === undefined,
+      "buildBackup : thèmes par livre validés, hostile → absent, global absent → undefined");
 
 
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);

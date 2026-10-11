@@ -37,7 +37,8 @@
 <title>Kola — Dépenses &amp; Budget</title>
 <style>
   :root {
-    --blue: #10b981; --green: #34c759; --red: #ff3b30; --orange: #ff9500;
+    --blue: #10b981; --grad-a: #10b981; --grad-b: #059669; --grad-c: #047857; --accent-rgb: 16,185,129;
+    --green: #34c759; --red: #ff3b30; --orange: #ff9500;
     --yellow: #ffcc00; --purple: #af52de; --pink: #ff2d55; --teal: #5ac8fa; --indigo: #5856d6;
     --bg: #f2f2f7; --bg-elevated: #ffffff; --card: #ffffff;
     --label: #000000; --secondary-label: #6d6d72; --tertiary-label: rgba(60,60,67,.3);
@@ -94,9 +95,9 @@
   /* ---------- Budget hero ---------- */
   .hero {
     margin: 4px 16px 8px; border-radius: 22px; padding: 22px 20px;
-    background: linear-gradient(135deg, #10b981 0%, #059669 55%, #047857 100%);
+    background: linear-gradient(135deg, var(--grad-a) 0%, var(--grad-b) 55%, var(--grad-c) 100%);
     color: #fff; position: relative; overflow: hidden;
-    box-shadow: 0 10px 26px rgba(16,185,129,.28);
+    box-shadow: 0 10px 26px rgba(var(--accent-rgb),.28);
   }
   .hero::after {
     content:""; position:absolute; right:-40px; top:-60px; width:220px; height:220px;
@@ -171,10 +172,10 @@
   .header-row { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
   .avatar {
     width:40px; height:40px; border-radius:50%; border:0; cursor:pointer; flex-shrink:0;
-    background: linear-gradient(135deg,#10b981,#059669); color:#fff;
+    background: linear-gradient(135deg,var(--grad-a),var(--grad-b)); color:#fff;
     font-family:inherit; font-size:16px; font-weight:700; line-height:1;
     display:flex; align-items:center; justify-content:center;
-    box-shadow: 0 4px 12px rgba(16,185,129,.3); transition: transform .15s;
+    box-shadow: 0 4px 12px rgba(var(--accent-rgb),.3); transition: transform .15s;
   }
   .avatar:active { transform: scale(.9); }
   .empty { text-align:center; color: var(--secondary-label); padding: 40px 20px; font-size: 15px; }
@@ -212,7 +213,7 @@
     position:fixed; right:18px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index:21;
     width:56px; height:56px; border-radius:50%; border:0; cursor:pointer;
     background: var(--blue); color:#fff; font-size:28px; font-weight:300; line-height:1;
-    box-shadow: 0 4px 14px rgba(16,185,129,.45);
+    box-shadow: 0 4px 14px rgba(var(--accent-rgb),.45);
     display:flex; align-items:center; justify-content:center;
     transition: transform .2s cubic-bezier(.32,.72,.33,1.4);
   }
@@ -242,7 +243,7 @@
     border:0; border-radius: 12px; background: var(--fill); color: var(--label); outline:none;
     transition: box-shadow .2s;
   }
-  .field input:focus { box-shadow: 0 0 0 3px rgba(16,185,129,.4); }
+  .field input:focus { box-shadow: 0 0 0 3px rgba(var(--accent-rgb),.4); }
   .amount-input { display:flex; align-items:baseline; }
   .amount-input .cur { font-size: 28px; font-weight: 700; margin-right: 6px; color: var(--tertiary-label); }
   .amount-input input { font-size: 32px !important; font-weight: 800; padding: 12px 14px !important; font-variant-numeric:tabular-nums; }
@@ -254,7 +255,7 @@
     background: var(--fill); border: 2px solid transparent; cursor:pointer;
     font-size: 15px; font-weight: 600; font-family:inherit; color: var(--label); transition: all .15s;
   }
-  .cat.on { border-color: var(--blue); background: rgba(16,185,129,.1); }
+  .cat.on { border-color: var(--blue); background: rgba(var(--accent-rgb),.1); }
   .btn-primary {
     width:100%; margin-top: 20px; padding: 15px; border-radius: 14px; border:0; cursor:pointer;
     background: var(--blue); color:#fff; font-size:17px; font-weight: 700; font-family:inherit;
@@ -327,7 +328,7 @@
     font-size:13px; font-weight:600; padding:9px 13px; border-radius: 20px;
     display:flex; align-items:center; gap:6px; transition: transform .15s, background .15s;
   }
-  .chip:active { transform: scale(.94); background: rgba(16,185,129,.12); }
+  .chip:active { transform: scale(.94); background: rgba(var(--accent-rgb),.12); }
   .chip .am { color: var(--blue); }
 
   /* Pavé numérique (tactiles) */
@@ -337,7 +338,7 @@
     border:0; cursor:pointer; font-family:inherit; font-size:22px; font-weight:700; color:var(--label);
     background:var(--fill); border-radius:12px; padding:14px 0; transition:transform .12s, background .12s;
   }
-  .keypad button:active { transform:scale(.93); background:rgba(16,185,129,.12); }
+  .keypad button:active { transform:scale(.93); background:rgba(var(--accent-rgb),.12); }
   /* Écrans tactiles : pavé maison, pas de clavier OS qui masque l'écran */
   @media (hover:none) and (pointer:coarse) {
     .keypad { display:grid; }
@@ -445,7 +446,7 @@
     border:0; cursor:pointer; font-family:inherit; font-size:20px; padding:8px 0;
     border-radius:10px; background: var(--fill); border:2px solid transparent; transition:all .15s;
   }
-  .emoji-cell.on { border-color: var(--blue); background: rgba(16,185,129,.1); }
+  .emoji-cell.on { border-color: var(--blue); background: rgba(var(--accent-rgb),.1); }
   .swatches { display:flex; flex-wrap:wrap; gap:9px; margin-top:8px; }
   .swatch {
     width:30px; height:30px; border-radius:50%; border:0; cursor:pointer; padding:0;
@@ -455,7 +456,7 @@
 
   /* Focus clavier : toujours visible (accessibilité) */
   button:focus-visible, [tabindex="0"]:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
-    outline: 3px solid rgba(16,185,129,.75); outline-offset: 2px; border-radius: 8px;
+    outline: 3px solid rgba(var(--accent-rgb),.75); outline-offset: 2px; border-radius: 8px;
   }
 
   /* ---------- Livres (chips + sheet) ---------- */
@@ -469,10 +470,17 @@
     background:var(--card); border:1.5px solid transparent; font-family:inherit; font-size:14px; font-weight:600;
     color:var(--secondary-label); cursor:pointer; white-space:nowrap; transition:all .15s;
   }
-  .book-chip.on { background:rgba(16,185,129,.12); border-color:var(--blue); color:var(--blue); }
+  .book-chip.on { background:rgba(var(--accent-rgb),.12); border-color:var(--blue); color:var(--blue); }
   .book-chip .cnt { font-size:11px; font-weight:700; opacity:.65; }
   .book-chip.add { border-style:dashed; }
   .book-edit-row { display:flex; align-items:center; justify-content:flex-end; gap:4px; }
+  .theme-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding:6px 20px 0; }
+  .theme-swatch {
+    height:76px; border-radius:16px; border:2px solid transparent; font-family:inherit; cursor:pointer;
+    display:flex; align-items:flex-end; padding:8px; color:#fff; font-size:13px; font-weight:600;
+    text-shadow:0 1px 2px rgba(0,0,0,.25); transition:all .15s;
+  }
+  .theme-swatch.on { border-color:var(--label); box-shadow:0 0 0 3px var(--fill); }
 
   /* ---------- Onboarding ---------- */
   .onboard {
@@ -495,7 +503,7 @@
   .ob-step.on { display:flex; animation: obIn .35s cubic-bezier(.32,.72,.33,1); }
   @keyframes obIn { from { opacity:0; transform: translateX(26px); } to { opacity:1; transform:none; } }
   .ob-hero { text-align:center; margin: 4vh 0 30px; }
-  .ob-hero img { width:104px; height:104px; border-radius:24px; box-shadow:0 10px 30px rgba(16,185,129,.35); }
+  .ob-hero img { width:104px; height:104px; border-radius:24px; box-shadow:0 10px 30px rgba(var(--accent-rgb),.35); }
   .ob-hero h1 { font-size:36px; font-weight:800; letter-spacing:-1px; margin-top:16px; }
   .ob-tag { font-size:16px; color:var(--secondary-label); line-height:1.5; margin-top:6px; }
   .ob-priv {
@@ -506,9 +514,9 @@
   .ob-sub { font-size:15px; color:var(--secondary-label); margin-top:6px; margin-bottom:18px; line-height:1.5; }
   .ob-avatar {
     width:64px; height:64px; border-radius:50%; margin: 6px auto 14px;
-    background: linear-gradient(135deg,#10b981,#059669); color:#fff;
+    background: linear-gradient(135deg,var(--grad-a),var(--grad-b)); color:#fff;
     display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700;
-    box-shadow: 0 6px 18px rgba(16,185,129,.35);
+    box-shadow: 0 6px 18px rgba(var(--accent-rgb),.35);
   }
   .ob-grid { display:grid; grid-template-columns: 1fr 1fr; gap:9px; margin: 4px 0 20px; }
   .ob-grid button {
@@ -516,7 +524,7 @@
     background:var(--fill); font-family:inherit; font-size:16px; font-weight:700; color:var(--label);
     transition:all .15s;
   }
-  .ob-grid button.on { border-color:var(--blue); background:rgba(16,185,129,.1); }
+  .ob-grid button.on { border-color:var(--blue); background:rgba(var(--accent-rgb),.1); }
   .ob-split { display:flex; flex-direction:column; gap:8px; margin: 4px 0 18px; }
   .ob-split .env { padding:6px 0; }
   .ob-toggle-row {
@@ -658,7 +666,7 @@
   <div class="list-header"><span class="t">Mon profil</span></div>
   <div class="group">
     <div class="setrow">
-      <div class="icon-badge" style="background:rgba(16,185,129,.15)" id="avatar-set">👤</div>
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)" id="avatar-set">👤</div>
       <div class="n">Mon prénom</div>
       <input id="user-name-input" aria-label="Mon prénom" type="text" maxlength="20"
              style="width:120px;padding:8px;text-align:right;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
@@ -669,7 +677,7 @@
       <div class="v" id="lang-current"></div>
     </div>
     <div class="setrow">
-      <div class="icon-badge" style="background:rgba(16,185,129,.15)">💱</div>
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)">💱</div>
       <div class="n">Monnaie</div>
       <select id="currency-select" aria-label="Devise" style="padding:8px 12px;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
         <option value="€">Euro €</option>
@@ -689,6 +697,14 @@
         <div class="bk-sub">Personnel, maison, un enfant… un suivi par livre</div>
       </div>
       <div class="v" id="books-count"></div>
+      <div class="v chev">›</div>
+    </div>
+    <div class="setrow" onclick="openThemeSheet()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(255,204,0,.18)">🎨</div>
+      <div class="n">Thème
+        <div class="bk-sub">Une couleur par livre, ou la même partout</div>
+      </div>
+      <div class="v" id="theme-current"></div>
       <div class="v chev">›</div>
     </div>
   </div>
@@ -734,7 +750,7 @@
       <div class="v" id="couple-last">jamais</div>
     </div>
     <div class="setrow" id="couple-import-row" style="display:none;cursor:pointer" onclick="document.getElementById('couple-file').click()" role="button" tabindex="0">
-      <div class="icon-badge" style="background:rgba(16,185,129,.15)">📥</div>
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)">📥</div>
       <div class="n">Importer le fichier du partenaire</div>
       <div class="v">.json</div>
     </div>
@@ -936,7 +952,7 @@
   <p class="hint" id="ocr-net" style="display:none">photo et reconnaissance du texte : le 1ᵉʳ chargement (~5 Mo) demande le réseau</p>
   <div class="field" id="ocr-bar-wrap" style="display:none">
     <div style="height:4px;background:var(--fill);border-radius:2px;overflow:hidden">
-      <div id="ocr-bar" style="width:0%;height:100%;background:#10b981;transition:width .3s"></div>
+      <div id="ocr-bar" style="width:0%;height:100%;background:var(--blue);transition:width .3s"></div>
     </div>
   </div>
   <div class="field" id="ocr-preview-wrap" style="display:none">
@@ -1176,7 +1192,7 @@
   <h2>Passer sur un autre appareil</h2>
   <p class="hint" style="margin:6px 0 10px">Kola ne transmet rien du tout : tu passes par un fichier. La ligne rouge du 100% local reste intacte.</p>
   <div class="group">
-    <div class="setrow"><div class="icon-badge" style="background:rgba(16,185,129,.15)">1</div><div class="n">Ici : Réglages → Sauvegarde complète (JSON)</div></div>
+    <div class="setrow"><div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)">1</div><div class="n">Ici : Réglages → Sauvegarde complète (JSON)</div></div>
     <div class="setrow"><div class="icon-badge" style="background:rgba(52,199,89,.15)">2</div><div class="n">Envoie le fichier par Mail, AirDrop ou WhatsApp</div></div>
     <div class="setrow"><div class="icon-badge" style="background:rgba(255,149,0,.15)">3</div><div class="n">Sur le nouvel appareil : Importer un fichier → choisis fusionner</div></div>
   </div>
@@ -1215,7 +1231,7 @@
   <h2>Exporter</h2>
   <div class="group">
     <div class="setrow" onclick="closeExportSheet(); exportBackup()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(16,185,129,.15)">💾</div>
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)">💾</div>
       <div class="n">Sauvegarde complète (JSON)</div>
       <div class="v">tout</div>
     </div>
@@ -1234,11 +1250,26 @@
   <div id="book-list"></div>
   <div class="group" style="margin-top:2px">
     <div class="setrow" onclick="bookEditNew()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(16,185,129,.15)">＋</div>
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)">＋</div>
       <div class="n" style="color:var(--blue);font-weight:600">Ajouter un livre</div>
     </div>
   </div>
   <button class="btn-ghost" onclick="closeBookSheet()" style="color:var(--secondary-label)">Fermer</button>
+</div>
+
+<div class="sheet" id="theme-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="theme-sheet-title">Thème</h2>
+  <div class="theme-grid" id="theme-grid"></div>
+  <p class="hint" id="theme-scope" style="padding:10px 20px 2px"></p>
+  <div class="group" id="theme-all" style="display:none">
+    <div class="setrow" onclick="themeAll()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(255,204,0,.18)">🎨</div>
+      <div class="n">Appliquer à tous les livres</div>
+      <div class="v chev">›</div>
+    </div>
+  </div>
+  <button class="btn-ghost" onclick="closeThemeSheet()" style="color:var(--secondary-label)">Fermer</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1334,6 +1365,26 @@ function catDefaults(){
    existant (stats, historique, vues, couple) lit l'état à plat sans le savoir. */
 const BOOK_FIELDS = ["budget","expenses","budgets","recurring","goals","cats"];
 const SAFE_BOOK_ID = /^[a-z0-9-]{1,24}$/i;
+/* Thèmes : l'accent (et les dégradés) par livre — ou global si le livre n'en définit pas */
+const THEMES = [
+  { id:"emerald", name:"Émeraude", a:"#10b981", b:"#059669", c:"#047857", rgb:"16,185,129" },
+  { id:"blue",    name:"Bleu",     a:"#0a84ff", b:"#0055d4", c:"#0044aa", rgb:"10,132,255" },
+  { id:"indigo",  name:"Indigo",   a:"#5856d6", b:"#4644b8", c:"#383a99", rgb:"88,86,214" },
+  { id:"violet",  name:"Violet",   a:"#af52de", b:"#9232c0", c:"#74269e", rgb:"175,82,222" },
+  { id:"rose",    name:"Rose",     a:"#ff2d55", b:"#d02145", c:"#a51937", rgb:"255,45,85" },
+  { id:"orange",  name:"Orange",   a:"#ff9500", b:"#d97a00", c:"#b36200", rgb:"255,149,0" },
+];
+const THEME_DEFAULT = "emerald";
+function themeOf(){ return THEMES.find(x => x.id === ((curBook() || {}).theme || state.theme)) || THEMES[0]; }
+/* applyTheme : pousse la palette du livre courant dans les variables CSS (fallback : :root) */
+function applyTheme(){
+  const t = themeOf();
+  const r = document.documentElement.style;
+  r.setProperty("--blue", t.a);
+  r.setProperty("--grad-a", t.a); r.setProperty("--grad-b", t.b || t.a); r.setProperty("--grad-c", t.c || t.a);
+  r.setProperty("--accent-rgb", t.rgb);
+  document.querySelectorAll('meta[name="theme-color"]:not([media])').forEach(m => m.setAttribute("content", t.a));
+}
 function safeBookName(n){
   return String(n ?? "").replace(/[<>&"'`\\{}]/g, "").slice(0, 40).trim() || "Livre";
 }
@@ -1367,6 +1418,7 @@ function booksEnsure(){
     seen.add(b.id);
     b.name = safeBookName(b.name);
     b.emoji = safeEmoji(b.emoji || "📖");
+    if (b.theme && !THEMES.some(t => t.id === b.theme)) delete b.theme;   // thème inconnu → global
     // tolère un livre arrivé sans objet `data` (ancien format intermédiaire)
     if (!b.data || typeof b.data !== "object" || Array.isArray(b.data)) b.data = {};
     b.data.budget = +b.data.budget || 0;
@@ -1378,6 +1430,7 @@ function booksEnsure(){
     return b;
   });
   if (!state.bookId || !seen.has(state.bookId)) state.bookId = state.books[0].id;
+  if (state.theme && !THEMES.some(t => t.id === state.theme)) delete state.theme;
   const c = curBook();
   BOOK_FIELDS.forEach(f => { state[f] = c.data[f]; });
 }
@@ -1393,7 +1446,7 @@ function bookSwitch(id){
   bookStore();
   state.bookId = id;
   BOOK_FIELDS.forEach(f => { state[f] = b.data[f]; });
-  save(); render(); renderBookbar(); renderBooksRow();
+  save(); render(); renderBookbar(); renderBooksRow(); applyTheme();
   if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
   toast(b.emoji + " " + b.name);
 }
@@ -1437,6 +1490,43 @@ function renderBooksRow(){
   const el = document.getElementById("books-count"); if (!el) return;
   const b = curBook();
   el.textContent = `${getBooks().length} · ${b ? b.name : ""}`;
+}
+/* --- Thème (palette par livre ou globale) --- */
+function openThemeSheet(){
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("theme-sheet").classList.add("show"); syncScrollLock();
+  renderThemeSheet();
+}
+function closeThemeSheet(){ const s = document.getElementById("theme-sheet");
+  if (s){ s.classList.remove("show"); clearSheetOverlay(); } }
+function renderThemeSheet(){
+  const grid = document.getElementById("theme-grid"); if (!grid) return;
+  const cur = themeOf();
+  const b = curBook() || {};
+  grid.innerHTML = THEMES.map(t =>
+    `<button class="theme-swatch${t.id === cur.id ? " on" : ""}" style="background:linear-gradient(135deg,${t.a},${t.b || t.a})" onclick="themeSet('${t.id}')">${esc(t.name)}</button>`).join("");
+  const scope = document.getElementById("theme-scope");
+  if (scope) scope.textContent = b.theme ? tt("🎨 Thème du livre « {a} »", { a: b.name }) : t("🎨 Thème global (tous les livres)");
+  const all = document.getElementById("theme-all");
+  if (all) all.style.display = b.theme ? "block" : "none";   // déjà global : rien à étendre
+}
+function themeSet(id){
+  const t = THEMES.find(x => x.id === id); if (!t) return;
+  const b = curBook(); if (!b) return;
+  b.theme = id;
+  save(); render(); renderThemeSheet(); renderThemeRow();
+  toast("🎨 " + tt("{a} — livre « {b} »", { a: t.name, b: b.name }));
+}
+function themeAll(){
+  const t = themeOf();
+  state.theme = t.id;
+  state.books.forEach(b => { if (b && b.theme) delete b.theme; });
+  save(); render(); renderThemeSheet(); renderThemeRow();
+  toast("🎨 " + tt("{a} — tous les livres", { a: t.name }));
+}
+function renderThemeRow(){
+  const el = document.getElementById("theme-current"); if (!el) return;
+  el.textContent = themeOf().name;
 }
 /* --- Sheet de gestion des livres --- */
 let bookEditId = null;   // id en cours d'édition, ou "new"
@@ -1972,6 +2062,20 @@ const I18N_EN = {
   "Livre actuel":"Current book",
   "Modifier les livres":"Edit books",
   "🗑️ Livre « {a} » supprimé":"🗑️ Book “{a}” deleted",
+  /* --- Thème --- */
+  "Thème":"Theme",
+  "Une couleur par livre, ou la même partout":"One color per book, or the same everywhere",
+  "🎨 Thème du livre « {a} »":"🎨 Book theme “{a}”",
+  "🎨 Thème global (tous les livres)":"🎨 Global theme (all books)",
+  "Appliquer à tous les livres":"Apply to all books",
+  "🎨 {a} — livre « {b} »":"🎨 {a} — book “{b}”",
+  "🎨 {a} — tous les livres":"🎨 {a} — all books",
+  "Émeraude":"Emerald",
+  "Bleu":"Blue",
+  "Indigo":"Indigo",
+  "Violet":"Purple",
+  "Rose":"Pink",
+  "Orange":"Orange",
   "Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.":"Delete book “{a}” and its {n} expense(s)? This cannot be undone.",
   "{n} livre(s)":"{n} book(s)",
   "objectif(s)":"goal(s)",
@@ -2722,7 +2826,7 @@ function renderCats(){
   });
   const add = document.createElement("div"); add.className = "setrow";
   add.setAttribute("role","button"); add.tabIndex = 0;
-  add.innerHTML = `<div class="icon-badge" style="background:rgba(16,185,129,.15)">➕</div>
+  add.innerHTML = `<div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)">➕</div>
     <div class="n" style="color:var(--blue);font-weight:600">${t("Ajouter une catégorie")}</div>`;
   add.onclick = openCatSheet;
   host.appendChild(add);
@@ -3304,6 +3408,8 @@ function buildBackup(s){
     sentIds: Array.isArray(s.couple.sentIds) ? s.couple.sentIds.filter(x=>SAFE_UUID.test(x)).slice(0,2000) : [],
     lastAt: SAFE_DATE.test(s.couple.lastAt || "") ? s.couple.lastAt : ""
   } : null;
+  // Thème : id simple lower-case (palette fermée de l'app ; inconnu → fallback au boot)
+  const themeOk = t => (typeof t === "string" && /^[a-z]{3,8}$/.test(t)) ? t : undefined;
   // Livres : chaque livre est validé par buildLedger (anti-injection identique)
   const booksIn = Array.isArray(s.books) ? s.books.filter(b =>
     b && typeof b === "object" && (() => { const d = (b.data && typeof b.data === "object" && !Array.isArray(b.data)) ? b.data : b; return Array.isArray(d.expenses); })()
@@ -3317,7 +3423,8 @@ function buildBackup(s){
       let id = bkBookId(b.id);
       if (!id || seen.has(id)) id = "b" + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
       seen.add(id);
-      return { id, name: bkName(b.name), emoji: safeEmoji(b.emoji || "📖"), data: buildLedger(d) };
+      const themeOut = themeOk(b.theme);
+      return { id, name: bkName(b.name), emoji: safeEmoji(b.emoji || "📖"), ...(themeOut ? { theme: themeOut } : {}), data: buildLedger(d) };
     });
     const act = booksOut.find(b => b.id === s.bookId) || booksOut[0];
     return {
@@ -3326,6 +3433,7 @@ function buildBackup(s){
       deviceId: (typeof s.deviceId === "string" && SAFE_UUID.test(s.deviceId)) ? s.deviceId : undefined,
       currency: s.currency || "€",
       onboarded: true,
+      theme: themeOk(s.theme),
       books: booksOut,
       bookId: act.id,
       user, couple,
@@ -3346,6 +3454,7 @@ function buildBackup(s){
     deviceId: (typeof s.deviceId === "string" && SAFE_UUID.test(s.deviceId)) ? s.deviceId : undefined,
     budget: led.budget,
     currency: s.currency || "€",
+    theme: themeOk(s.theme),
     onboarded: true,
     cats: led.cats,
     budgets: led.budgets,
@@ -3967,8 +4076,9 @@ function applyBackupMerge(){
       if (mine){
         added += mergeLedgerInto(mine.data, data);
         if (!+mine.data.budget && +data.budget) mine.data.budget = +data.budget;
+        if (sb.theme && !mine.theme) mine.theme = sb.theme;   // adopte le thème du livre importé
       } else {
-        state.books.push({ id: sb.id, name: sb.name, emoji: sb.emoji,
+        state.books.push({ id: sb.id, name: sb.name, emoji: sb.emoji, ...(sb.theme ? { theme: sb.theme } : {}),
           data: { budget:+data.budget||0, expenses:(data.expenses||[]).slice(), budgets:{...(data.budgets||{})},
                   recurring:(data.recurring||[]).slice(), goals:(data.goals||[]).map(g=>({...g})), cats:{...(data.cats||{})} } });
         added += (data.expenses||[]).length;
@@ -4226,7 +4336,7 @@ function resetAll(){
 function render(){
   updateGreeting();
   renderLangRow();
-  renderBookbar(); renderBooksRow();
+  renderBookbar(); renderBooksRow(); renderThemeRow(); applyTheme();
   document.getElementById("set-cur").textContent = state.currency;
   if (document.getElementById("page-home").classList.contains("active")) renderHome();
   else if (document.getElementById("page-stats").classList.contains("active")) {

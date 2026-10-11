@@ -254,6 +254,15 @@ eq(esc("<img src=x onerror=alert(1)>"), "&lt;img src=x onerror=alert(1)&gt;", "e
 eq(esc('"a\'&'), "&quot;a&#39;&amp;", "esc : guillemets + &");
 eq(esc(null), "", "esc : null → chaîne vide");
 
+/* ======== byRecent (ordre récent→ancien, tolérant aux données anormales) ======== */
+const recentFns = new Function(grab("/* Ordre canonique", "function renderList") + "return { byRecent };")();
+const { byRecent } = recentFns;
+check(byRecent({ date:"2026-10-11" }, { date:"2026-10-10" }) < 0, "byRecent : plus récent d'abord");
+check(byRecent({ date:"2026-10-11", ts:1 }, { date:"2026-10-11", ts:9 }) > 0, "byRecent : ts décroissant intra-jour");
+let threw = false;
+try { byRecent(null, { date:"2026-10-10" }); byRecent({ date:"2026-10-10" }, undefined); } catch(e){ threw = true; }
+check(!threw, "byRecent : entrées null/undefined ne plantent pas");
+
 /* ======== Livres (multi-suivis) ======== */
 const docStub = { getElementById: () => ({ classList: { contains: () => false } }),
   documentElement: { style: { setProperty: () => {} } }, querySelectorAll: () => [] };

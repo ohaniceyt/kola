@@ -1376,6 +1376,7 @@ function stateInit(raw){
   }
   if (!state || typeof state !== "object") { state = { budget: 0, currency: "€", expenses: [] }; }
   if (!Array.isArray(state.expenses)) state.expenses = [];
+  state.expenses = state.expenses.filter(e => e && typeof e === "object");
   if (!state.v || state.v < SCHEMA_VERSION) { state.v = SCHEMA_VERSION; }   // migrations future-proof
   if (!state.cats) { state.cats = catDefaults(); }
   if (!state.budgets) { state.budgets = {}; }
@@ -2716,7 +2717,7 @@ function renderHome(){
   drawDonut("donut","legend",monthSpendByCat());
   renderEnvelopes();
   renderGoals();
-  renderList("recent-list", state.expenses.slice(0,6), true);
+  renderList("recent-list", [...state.expenses].sort(byRecent).slice(0,6), true);
 }
 
 function drawDonut(svgId, legendId, byCat){
@@ -2745,6 +2746,14 @@ function drawDonut(svgId, legendId, byCat){
 
 function emptyState(icon, title, sub){
   return `<div class="empty-state"><div class="ico">${icon}</div><div class="t">${title}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
+}
+/* Ordre canonique « du plus récent au plus ancien » : date, puis ts (saisie intra-jour), puis id.
+   Tolérant aux entrées anormales (null, date manquante) : une donnée corrompue doit bloquer l'app. */
+function byRecent(a,b){
+  const da = String((a || {}).date || ""), db = String((b || {}).date || "");
+  return db.localeCompare(da)
+      || ((b || {}).ts || 0) - ((a || {}).ts || 0)
+      || String((b || {}).id || "").localeCompare(String((a || {}).id || ""));
 }
 function renderList(elId, items, compact, emptyMsg){
   const host = document.getElementById(elId);
@@ -4178,7 +4187,7 @@ function closeEveningSheet(){
 function renderEveningView(){
   const host = document.getElementById("evening-content");
   const today = todayISO();
-  const todays = state.expenses.filter(e=>e.date===today).slice().sort((a,b)=>b.amount-a.amount);
+  const todays = state.expenses.filter(e=>e.date===today).slice().sort((a,b)=>b.amount-a.amount);   // montant desc : la plus grosse en tête
   const totalToday = todays.reduce((s,e)=>s+e.amount,0);
   const month = today.slice(0,7);
   const bud = catBudgetTotal() || state.budget;
@@ -4338,7 +4347,7 @@ let histShown = HIST_PAGE;
 function applyHistoryFilter(){
   const f = document.getElementById("hist-filter").dataset.c || "all";
   const q = (document.getElementById("hist-search").value||"").toLowerCase().trim();
-  const all = [...state.expenses].sort((a,b)=> b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0) || b.id.localeCompare(a.id));
+  const all = [...state.expenses].sort(byRecent);
   let items = f==="all" ? all : all.filter(e=>e.cat===f);
   if (q) items = items.filter(e=> e.name.toLowerCase().includes(q) || catOf(e.cat).label.toLowerCase().includes(q));
   const total = items.reduce((s,e)=>s+e.amount,0);

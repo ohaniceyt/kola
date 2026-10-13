@@ -811,6 +811,14 @@
   <div class="group" id="cat-manage"></div>
   <div class="list-header"><span class="t">Données</span></div>
   <div class="group">
+    <div class="setrow" onclick="openAutoSheet()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.15)">🛟</div>
+      <div class="n">Sauvegardes automatiques
+        <div class="bk-sub">Un instantané à chaque ouverture — 7 jours gardés, rien à faire</div>
+      </div>
+      <div class="v" id="auto-last">—</div>
+      <div class="v chev">›</div>
+    </div>
     <div class="setrow" onclick="openExportSheet()" role="button" tabindex="0" style="cursor:pointer">
       <div class="icon-badge" style="background:rgba(52,199,89,.14)">💾</div>
       <div class="n">Sauvegarder &amp; exporter</div>
@@ -861,7 +869,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.5</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.6</div></div>
   </div>
 </div>
 
@@ -1348,6 +1356,15 @@
   <button class="pwa-x" onclick="dismissPwaBanner()" aria-label="Plus tard">✕</button>
 </div>
 
+<div class="sheet" id="auto-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="auto-title">Sauvegardes automatiques</h2>
+  <p class="hint" style="text-align:left;padding:2px 0 8px">Kola enregistre un instantané complet quand tu ouvres l'app (dernières 7 journées gardées). Tout reste dans le stockage durable de ce téléphone (IndexedDB) — rien n'est envoyé, rien à faire. Utile si un livre est supprimé par erreur ou qu'un import tourne mal : tu reviens en arrière d'un tap.</p>
+  <div id="auto-list"></div>
+  <button class="btn-ghost" onclick="wipeAutoSnaps()" id="auto-wipe" style="color:var(--red);display:none">Supprimer toutes les sauvegardes auto</button>
+  <button class="btn-ghost" onclick="closeAutoSheet()" style="color:var(--secondary-label)">Fermer</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1418,6 +1435,8 @@ async function load(){
   }
   if (idbWrap && idbRev > 0 && (+state.rev||0) > idbRev){ idbPersist(); }  // sync immédiat de la copie durable
   save();
+  maybeAutoSnap(true);                  // premier instantané du jour s'il n'existe pas
+  renderAutoRow();
 }
 
 const SPLITS = { food:.30, bills:.25, transport:.10, shopping:.10, fun:.10, health:.05, other:.10 };
@@ -1593,7 +1612,7 @@ const LEGAL = {
     ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
           "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
     ["h", "Version", "Version"],
-    ["p", "Kola v0.5 — dernière mise à jour : octobre 2026.", "Kola v0.5 — last updated: October 2026."],
+    ["p", "Kola v0.6 — dernière mise à jour : octobre 2026.", "Kola v0.5 — last updated: October 2026."],
   ],
   confidentialite: [
     ["h", "L'essentiel", "The essentials"],
@@ -1745,6 +1764,7 @@ function autoSplitBudget(){
 }
 function save(){
   if (Array.isArray(state.books)) bookStore();   // le livre courant reste synchronisé avant chaque écriture
+  maybeAutoSnap();                               // instantané automatique 1×/jour (IndexedDB)
   state.rev = (+state.rev || 0) + 1;   // compteur monotone : arbitre entre les 2 copies
   let lsOk = false;
   try {
@@ -1764,8 +1784,10 @@ let idb = null, idbTimer = null;
 function idbOpen(){
   return new Promise(res=>{
     try {
-      const rq = indexedDB.open("kola", 1);
-      rq.onupgradeneeded = ()=>{ const db = rq.result; if (!db.objectStoreNames.contains("state")) db.createObjectStore("state"); };
+      const rq = indexedDB.open("kola", 2);
+      rq.onupgradeneeded = ()=>{ const db = rq.result;
+        if (!db.objectStoreNames.contains("state")) db.createObjectStore("state");
+        if (!db.objectStoreNames.contains("snaps")) db.createObjectStore("snaps", { keyPath: "key" }); };
       rq.onsuccess = ()=>res(rq.result);
       rq.onerror = ()=>res(null);
       rq.onblocked = ()=>res(null);
@@ -1794,6 +1816,99 @@ async function idbPersist(){
   } catch(err){ console.warn("Kola : IndexedDB inaccessible", err); }
 }
 let idbFailures = 0;
+
+/* ============ Sauvegardes automatiques (7 derniers jours, IndexedDB) ============ */
+const AUTO_SNAPS = 7;
+let snapQueued = false;
+const idbSnapsOk = () => !!(idb && idb.objectStoreNames && idb.objectStoreNames.contains("snaps"));
+/* Peut-être un instantané : au plus une fois par jour (état complet gelé, inclut les livres) */
+function maybeAutoSnap(immediate){
+  if (!idbSnapsOk() || !state || snapQueued) return;
+  const d = todayISO();
+  if (state.lastSnapAt === d && !immediate) return;   // déjà fait aujourd'hui
+  snapQueued = true;
+  setTimeout(() => {
+    snapQueued = false;
+    try {
+      const wrap = { app:"kola", schema:SCHEMA_VERSION, exportedAt:d, savedAt:new Date().toISOString(), rev:+state.rev||0, state: JSON.parse(JSON.stringify(state)) };
+      const tx = idb.transaction("snaps","readwrite");
+      tx.objectStore("snaps").put({ key: d, wrap });
+      tx.oncomplete = () => { state.lastSnapAt = d; renderAutoRow(); };   // pas de save() ici : la propriété partira avec le prochain changement
+      tx.onerror = () => console.warn("Kola : instantané auto impossible");
+    } catch(err){ console.warn("Kola : instantané auto impossible", err); }
+  }, 1500);   // hors du coup de l'action utilisateur
+}
+function listAutoSnaps(){
+  return new Promise(res => {
+    if (!idbSnapsOk()) return res([]);
+    try {
+      const tx = idb.transaction("snaps","readonly");
+      const rq = tx.objectStore("snaps").getAll();
+      rq.onsuccess = () => res((rq.result || []).filter(x => x && x.key && x.wrap).sort((a,b) => b.key.localeCompare(a.key)).slice(0, AUTO_SNAPS));
+      rq.onerror = () => res([]);
+      tx.onabort = () => res([]);
+    } catch(_){ res([]); }
+  });
+}
+async function pruneAutoSnaps(){
+  const snaps = await listAutoSnaps();
+  const old = snaps.slice(AUTO_SNAPS);
+  if (!old.length) return;
+  try {
+    const tx = idb.transaction("snaps","readwrite");
+    old.forEach(x => tx.objectStore("snaps").delete(x.key));
+  } catch(_){}
+}
+function renderAutoRow(){
+  const el = document.getElementById("auto-last"); if (!el) return;
+  if (!idbSnapsOk()){ el.textContent = "n/a"; return; }
+  el.textContent = state.lastSnapAt ? state.lastSnapAt : "—";
+}
+function openAutoSheet(){
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("auto-sheet").classList.add("show"); syncScrollLock();
+  renderAutoSheet();
+}
+function closeAutoSheet(){ const sl = document.getElementById("auto-sheet");
+  if (sl){ sl.classList.remove("show"); clearSheetOverlay(); } }
+async function renderAutoSheet(){
+  const host = document.getElementById("auto-list"); if (!host) return;
+  const snaps = await listAutoSnaps();
+  const wipe = document.getElementById("auto-wipe");
+  if (wipe) wipe.style.display = snaps.length ? "block" : "none";
+  if (!snaps.length){
+    host.innerHTML = `<div class="group"><div class="setrow"><div class="icon-badge" style="background:var(--fill)">🛟</div><div class="n">${esc(t("Aucune sauvegarde encore"))}<div class="bk-sub">${esc(t("Elle apparaîtra après ton premier changement du jour."))}</div></div></div></div>`;
+    return;
+  }
+  host.innerHTML = `<div class="group">` + snaps.map(x => {
+    const st = (x.wrap && x.wrap.state) || {};
+    const n = ((st.expenses||[]).length || 0) + (Array.isArray(st.books) ? st.books.reduce((a,b)=>a + ((b.data||{}).expenses||[]).length, 0) : 0);
+    return `<div class="setrow" role="button" tabindex="0" style="cursor:pointer" onclick="restoreAutoSnap('${x.key}')">
+      <div class="icon-badge" style="font-size:16px;background:var(--fill)">📅</div>
+      <div class="n">${esc(x.key)}<div class="bk-sub">${esc(tt("{n} dépense(s)", {n}))}</div></div>
+      <div class="v">${esc(t("Restaurer"))} ›</div>
+    </div>`;
+  }).join("") + `</div>`;
+}
+/* Restauration : reprend le circuit d'import (aperçu → fusion ou remplacement) — validation complète incluse */
+function restoreAutoSnap(key){
+  listAutoSnaps().then(snaps => {
+    const hit = (snaps || []).find(x => x.key === key);
+    if (!hit){ toast(t("Introuvable")); return; }
+    closeAutoSheet();
+    importBackupText(JSON.stringify(hit.wrap));
+  });
+}
+function wipeAutoSnaps(){
+  if (!idbSnapsOk()) return;
+  if (!confirm(t("Supprimer toutes les sauvegardes automatiques de cet appareil ? Les données actuelles ne sont pas affectées."))) return;
+  try {
+    const tx = idb.transaction("snaps","readwrite");
+    tx.objectStore("snaps").clear();
+  } catch(_){}
+  renderAutoSheet();
+}
+
 function idbClose(){
   if (++idbFailures > 3){ idb = null; console.warn("Kola : IndexedDB abandonnée (3 blocages) — localStorage seul"); }
 }
@@ -2232,6 +2347,17 @@ const I18N_EN = {
   "Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.":"Delete book “{a}” and its {n} expense(s)? This cannot be undone.",
   "{n} livre(s)":"{n} book(s)",
   "Renommer":"Rename",
+  /* --- Sauvegardes automatiques --- */
+  "Sauvegardes automatiques":"Automatic backups",
+  "Un instantané par jour, 7 jours gardés — rien à faire":"A snapshot a day, 7 days kept — nothing to do",
+  "Kola enregistre un instantané complet chaque jour où tu apportes un changement. Tout reste dans le stockage durable de ce téléphone (IndexedDB) — rien n'est envoyé. Utile si un livre est supprimé par erreur ou qu'un import tourne mal.":"Kola records a full snapshot every day you make a change. It all stays in this phone's durable storage (IndexedDB) — nothing is sent. Useful if a book is deleted by mistake or an import goes wrong.",
+  "Restaurer":"Restore",
+  "Aucune sauvegarde encore":"No backup yet",
+  "Elle apparaîtra après ton premier changement du jour.":"It will appear after your first change of the day.",
+  "Introuvable":"Not found",
+  "Un instantané à chaque ouverture — 7 jours gardés, rien à faire":"A snapshot on every open — 7 days kept, nothing to do",
+  "Kola enregistre un instantané complet quand tu ouvres l'app (dernières 7 journées gardées). Tout reste dans le stockage durable de ce téléphone (IndexedDB) — rien n'est envoyé, rien à faire. Utile si un livre est supprimé par erreur ou qu'un import tourne mal : tu reviens en arrière d'un tap.":"Kola records a full snapshot when you open the app (last 7 days kept). It all stays in this phone's durable storage (IndexedDB) — nothing is sent, nothing to do. Useful if a book is deleted by mistake or an import goes wrong: you go back in one tap.","Supprimer toutes les sauvegardes auto":"Delete all automatic backups",
+  "Supprimer toutes les sauvegardes automatiques de cet appareil ? Les données actuelles ne sont pas affectées.":"Delete all automatic backups on this device? Current data is not affected.",
   "Installe l'app":"Install the app",
   "iPhone : bouton Partager ↓ → « Sur l'écran d'accueil ». Tu l'auras en plein écran, hors ligne, comme une vraie appli.":"iPhone: Share button ↓ → “Add to Home Screen”. You'll get it full screen, offline, like a real app.",
   /* --- Légal --- */
@@ -2288,6 +2414,7 @@ const I18N_EN = {
   "📲 L'app fonctionne hors ligne":"📲 The app works offline",
   "Supprimer TOUTES les dépenses ? Cette action est irréversible.":"Delete ALL expenses? This cannot be undone.",
   "Supprimer TOUTES les données ? Dépenses, budgets, enveloppes, objectifs, récurrences et profil. Action irréversible.":"Delete ALL data? Expenses, budgets, envelopes, goals, recurring and profile. This cannot be undone.",
+  "Supprimer TOUTES les données ? Dépenses, budgets, enveloppes, objectifs, récurrences et profil. Les sauvegardes automatiques récentes restent récupérables (Réglages → Données). Les sauvegardes exportées (fichiers) ne sont pas concernées.":"Delete ALL data? Expenses, budgets, envelopes, goals, recurring and profile. Recent automatic backups remain recoverable (Settings → Data). Exported backup files are unaffected.",
   "Supprimer":"Delete",
   "Modifier":"Edit",
   "Supprimer l'objectif":"Delete goal",
@@ -4478,6 +4605,7 @@ function obFinish(mode, skipped){
     if (document.getElementById("ob-autosplit").checked) autoSplitBudget();
   }
   state.onboarded = true;
+  if (typeof renderAutoRow === "function") renderAutoRow();
   save();
   document.getElementById("onboard").classList.remove("show");
   setTimeout(checkInstallBanner, 1200);
@@ -4503,11 +4631,13 @@ function toast(msg){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200);
 }
 function resetAll(){
-  if (confirm(tt("Supprimer TOUTES les données ? Dépenses, budgets, enveloppes, objectifs, récurrences et profil. Action irréversible.", {}))){
+  if (confirm(tt("Supprimer TOUTES les données ? Dépenses, budgets, enveloppes, objectifs, récurrences et profil. Les sauvegardes automatiques récentes restent récupérables (Réglages → Données). Les sauvegardes exportées (fichiers) ne sont pas concernées.", {}))){
     state.expenses = []; state.budgets = {}; state.budget = 0;
     state.goals = []; state.recurring = []; state.user = { name: "" };
     state.lastBackupAt = ""; state.lastMonthlyBackup = ""; state.backupPostponedAt = "";
-    idbErase(); save(); render(); toast("Données effacées");
+    state.books = []; state.bookId = "";                 // les livres aussi — recréera « Personnel » vide
+    booksEnsure();
+    idbErase(); save(); render(); renderBookbar(); renderBooksRow(); toast("Données effacées");
   }
 }
 

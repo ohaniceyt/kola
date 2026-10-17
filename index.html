@@ -1817,6 +1817,18 @@ async function idbPersist(){
 }
 let idbFailures = 0;
 
+/* Journal d'erreurs local : si l'app plante (freeze/blanc), le dernier incident
+   se lit dans Réglages → Sauvegardes automatiques (partie basse) — 100% local. */
+function __errLog(kind, msg){
+  try {
+    const lines = (localStorage.getItem("kola-errlog") || "").split("\n").filter(Boolean).slice(-4);
+    lines.push(new Date().toISOString() + " " + kind + " " + String(msg).slice(0, 300));
+    localStorage.setItem("kola-errlog", lines.join("\n"));
+  } catch(_){}
+}
+window.addEventListener("error", e => __errLog("ERR", (e && (e.message || (e.error && e.error.message))) || "inconnu"));
+window.addEventListener("unhandledrejection", e => __errLog("PROMISE", (e && e.reason && (e.reason.message || e.reason)) || "rejet inconnu"));
+
 /* ============ Sauvegardes automatiques (7 derniers jours, IndexedDB) ============ */
 const AUTO_SNAPS = 7;
 let snapQueued = false;
@@ -1827,7 +1839,9 @@ function maybeAutoSnap(immediate){
   const d = todayISO();
   if (state.lastSnapAt === d && !immediate) return;   // déjà fait aujourd'hui
   snapQueued = true;
-  setTimeout(() => {
+  // loin de l'interaction : idle s'il existe (pas sur Safari), sinon 4 s après le dernier changement
+  const schedule = (window.requestIdleCallback || (f => setTimeout(f, 4000)));
+  schedule(() => {
     snapQueued = false;
     try {
       const wrap = { app:"kola", schema:SCHEMA_VERSION, exportedAt:d, savedAt:new Date().toISOString(), rev:+state.rev||0, state: JSON.parse(JSON.stringify(state)) };
@@ -1873,11 +1887,17 @@ function closeAutoSheet(){ const sl = document.getElementById("auto-sheet");
   if (sl){ sl.classList.remove("show"); clearSheetOverlay(); } }
 async function renderAutoSheet(){
   const host = document.getElementById("auto-list"); if (!host) return;
+  // diagnostic local (le dernier incident, le cas échéant) : se lit ici si l'app a gelé
+  let errs = "";
+  try {
+    const raw = (localStorage.getItem("kola-errlog") || "");
+    if (raw) errs = `<p class="hint" style="text-align:left;padding:4px 0 2px"><b>${esc(t("Dernier incident technique"))} :</b><br><code style="font-size:11px;word-break:break-all">${esc(raw.split("\n").join(" · "))}</code><br><a href="#" id="err-erase">${esc(t("Effacer ce journal"))}</a></p>`;
+  } catch(_){}
   const snaps = await listAutoSnaps();
   const wipe = document.getElementById("auto-wipe");
   if (wipe) wipe.style.display = snaps.length ? "block" : "none";
   if (!snaps.length){
-    host.innerHTML = `<div class="group"><div class="setrow"><div class="icon-badge" style="background:var(--fill)">🛟</div><div class="n">${esc(t("Aucune sauvegarde encore"))}<div class="bk-sub">${esc(t("Elle apparaîtra après ton premier changement du jour."))}</div></div></div></div>`;
+    host.innerHTML = errs + `<div class="group"><div class="setrow"><div class="icon-badge" style="background:var(--fill)">🛟</div><div class="n">${esc(t("Aucune sauvegarde encore"))}<div class="bk-sub">${esc(t("Elle apparaîtra après ton premier changement du jour."))}</div></div></div></div>`;
     return;
   }
   host.innerHTML = `<div class="group">` + snaps.map(x => {
@@ -1888,8 +1908,15 @@ async function renderAutoSheet(){
       <div class="n">${esc(x.key)}<div class="bk-sub">${esc(tt("{n} dépense(s)", {n}))}</div></div>
       <div class="v">${esc(t("Restaurer"))} ›</div>
     </div>`;
-  }).join("") + `</div>`;
+  }).join("") + `</div>` + errs;
 }
+addEventListener("click", function(ev){
+  if (ev.target && ev.target.id === "err-erase"){
+    ev.preventDefault();
+    try { localStorage.removeItem("kola-errlog"); } catch(_){}
+    renderAutoSheet(); toast("Journal effacé");
+  }
+}, true);
 /* Restauration : reprend le circuit d'import (aperçu → fusion ou remplacement) — validation complète incluse */
 function restoreAutoSnap(key){
   listAutoSnaps().then(snaps => {

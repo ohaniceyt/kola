@@ -1,5 +1,5 @@
 /* Kola — service worker (network-first pour l'app shell, offline-first pour le reste) */
-const CACHE = "kola-v11";
+const CACHE = "kola-v12";
 // Les splash screens iOS (icons/splash/) ne sont PAS pré-cachés : ~150 Ko à l'install
 // pour un usage qui n'est pas hors-ligne critique. Ils entrent au cache runtime
 // (offline-first) dès la première consultation en ligne.

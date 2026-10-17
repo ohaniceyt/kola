@@ -3040,8 +3040,8 @@ function openSheet(){
   if (!KP_TOUCH) setTimeout(()=>document.getElementById("in-amount").focus(), 460);
 }
 function closeSheet(){
-  document.getElementById("overlay").classList.remove("show"); syncScrollLock();
   document.getElementById("sheet").classList.remove("show");
+  document.getElementById("overlay").classList.remove("show"); syncScrollLock();
   document.getElementById("in-amount").value=""; document.getElementById("in-name").value="";
 }
 function saveExpense(){
@@ -3114,6 +3114,7 @@ function clearSheetOverlay(){
 }
 function closeAllSheets(){
   closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet(); closeEveningSheet(); closeOcrSheet(); closeCoupleSheet(); pairClose(); closeExportSheet();
+  closeBookSheet(); closeThemeSheet(); closeAutoSheet(); closeLegalSheet();
   closeOpenSwipe();
   clearSheetOverlay();
 }

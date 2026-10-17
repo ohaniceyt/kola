@@ -3064,7 +3064,7 @@ function deleteFlow(id){
 
 /* ============ Modifier une dépense ============ */
 let editId = null;
-function closeEditSheet(){ document.getElementById("edit-sheet").classList.remove("show"); }
+function closeEditSheet(){ document.getElementById("edit-sheet").classList.remove("show"); clearSheetOverlay(); }
 function openEdit(id){
   const e = state.expenses.find(x=>x.id===id); if(!e) return;
   editId = id;
@@ -3523,6 +3523,7 @@ function openRecEdit(r){
 }
 function closeRecSheet(){
   document.getElementById("rec-sheet").classList.remove("show");
+  clearSheetOverlay();
   editRec = null;
 }
 function deleteRecFromEdit(){

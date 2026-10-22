@@ -617,7 +617,10 @@
   </div>
 
   <div class="card" id="dettes-card" style="display:none">
-    <div class="list-header" style="padding:0 0 6px"><span class="t" style="font-size:17px" id="dettes-title">🤝 Dettes</span></div>
+    <div class="list-header" style="padding:0 0 6px">
+      <span class="t" style="font-size:17px">🤝 Dettes</span>
+      <button onclick="openDebtSheet()" aria-label="Ajouter une dette">＋ Dette</button>
+    </div>
     <div id="dettes-host"></div>
   </div>
 
@@ -874,7 +877,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.7</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.8</div></div>
   </div>
 </div>
 
@@ -1673,7 +1676,7 @@ const LEGAL = {
     ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
           "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
     ["h", "Version", "Version"],
-    ["p", "Kola v0.7 — dernière mise à jour : octobre 2026.", "Kola v0.7 — last updated: October 2026."],
+    ["p", "Kola v0.8 — dernière mise à jour : octobre 2026.", "Kola v0.8 — last updated: October 2026."],
   ],
   confidentialite: [
     ["h", "L'essentiel", "The essentials"],
@@ -2439,6 +2442,7 @@ const I18N_EN = {
   "Type de livre":"Book type",
   "📕 Dépenses":"📕 Expenses",
   "Nouvelle dette":"New debt",
+  "＋ Dette":"＋ Debt",
   "Modifier la dette":"Edit debt",
   "Personne / Motif":"Person / Reason",
   "Échéance (facultatif)":"Due date (optional)",
@@ -2651,6 +2655,8 @@ const I18N_EN_T = {
   "Supprimer la dette « {a} » ({b}) ?":"Delete debt « {a} » ({b})?",
   "Supprimer le livre « {a} » et ses {n} dette(s) ? Action irréversible.":"Delete book « {a} » and its {n} debt(s)? Irreversible.",
   "🤝 {n} dette(s) fusionnée(s)":"🤝 {n} debt(s) merged",
+  "Net : {a} · {n} dette(s)":"Net: {a} · {n} debt(s)",
+  "Note un prêt ou une dette en un tap — pour un suivi complet, fais un livre 🤝 Dettes.":"Log a loan or debt in one tap — for full tracking, make a 🤝 Debts book.",
   "Catégorie {a}, {b}, glisse à droite pour modifier, à gauche pour supprimer":"Category {a}, {b}, swipe right to edit, left to delete",
   "Dépense : {a}, {b}":"Expense: {a}, {b}",
   "Enveloppe mensuelle : {a}":"Monthly envelope: {a}",
@@ -2965,8 +2971,9 @@ function renderHome(){
   });
   const rh = document.getElementById("recent-header"), dc = document.getElementById("dettes-card");
   if (rh) rh.style.display = dettes ? "none" : "";
-  if (dc) dc.style.display = dettes ? "" : "none";
+  if (dc) dc.style.display = dettes ? "none" : "";   // livre dettes : le héros + les listes font déjà le travail
   if (dettes){ backupReminder(); renderDettesHome(); return; }
+  if (dc) dc.style.display = "";   // livre dépenses : carte dettes compacte (phase 2)
   const month = todayISO().slice(0,7);
   const spent = state.expenses.filter(e=>e.date.startsWith(month)).reduce((s,e)=>s+e.amount,0);
   const bud = catBudgetTotal() || state.budget;
@@ -2994,6 +3001,7 @@ function renderHome(){
   drawDonut("donut","legend",monthSpendByCat());
   renderEnvelopes();
   renderGoals();
+  renderDettesCard();
   renderList("recent-list", [...state.expenses].sort(byRecent).slice(0,6), true);
 }
 
@@ -3898,6 +3906,36 @@ function delDebt(){
   debtEditId = null;
   closeDebtSheet(); save(); render();
 }
+/* Rendu partagé des listes de dettes (vue livre dettes et carte des livres dépenses) */
+function debByOrder(a, b){
+  return (debtRemain(a) > 0 ? 0 : 1) - (debtRemain(b) > 0 ? 0 : 1)
+      || String(b.date || "").localeCompare(String(a.date || ""));
+}
+function debtRow(d){
+  const rem = debtRemain(d);
+  const pct = d.amount > 0 ? Math.min(100, Math.round(d.paid / d.amount * 100)) : 100;
+  const overdue = rem > 0 && d.due && d.due < todayISO();
+  const sub = rem <= 0 ? `✓ ${t("Payée")}`
+            : (overdue ? "⚠️ " : "") +
+              tt("Reste {a} · remboursé {p} %", { a: money(rem), p: pct }) +
+              (d.due ? " · " + tt("Échéance {a}", { a: overdue ? d.due : dayName(d.due) }) : "");
+  const amt = rem <= 0 ? "✓" : (d.dir === "dois" ? "−" : "+") + money(rem);
+  const col = rem <= 0 ? "var(--green)" : (d.dir === "dois" ? "var(--red)" : "var(--label)");
+  return `<div class="rowitem" role="button" tabindex="0" onclick="openDebtSheet('${d.id}')"
+            aria-label="${esc(tt("Dette : {a}, {b}", { a: d.name, b: money(d.amount) }))}">
+    <div class="icon-badge" style="background:rgba(var(--accent-rgb),.14)">${d.dir === "dois" ? "💸" : "🤝"}</div>
+    <div class="txt"><div class="n">${esc(d.name)}</div><div class="d">${esc(sub)}</div></div>
+    <div class="amt" style="color:${col}">${amt}</div>
+  </div>`;
+}
+function debGroupsHtml(){
+  const group = (dir, title) => {
+    const list = state.debts.filter(d => d.dir === dir).sort(debByOrder);
+    if (!list.length) return "";
+    return `<div class="list-header" style="padding:14px 0 6px"><span class="t">${esc(title)}</span></div><div class="group">${list.map(debtRow).join("")}</div>`;
+  };
+  return group("dois", t("Je dois")) + group("me", t("On me doit"));
+}
 function renderDettesHome(){
   const tl = debtTotals(state.debts);
   const labelEl = document.getElementById("hero-label");
@@ -3926,33 +3964,17 @@ function renderDettesHome(){
     bar.firstElementChild.style.width = tl.pct + "%";
     bar.firstElementChild.style.background = "#fff";
   }
-  const byDebt = (a, b) => (debtRemain(a) > 0 ? 0 : 1) - (debtRemain(b) > 0 ? 0 : 1)
-                          || String(b.date || "").localeCompare(String(a.date || ""));
-  const debtRow = d => {
-    const rem = debtRemain(d);
-    const pct = d.amount > 0 ? Math.min(100, Math.round(d.paid / d.amount * 100)) : 100;
-    const overdue = rem > 0 && d.due && d.due < todayISO();
-    const sub = rem <= 0 ? `✓ ${t("Payée")}`
-              : (overdue ? "⚠️ " : "") +
-                tt("Reste {a} · remboursé {p} %", { a: money(rem), p: pct }) +
-                (d.due ? " · " + tt("Échéance {a}", { a: overdue ? d.due : dayName(d.due) }) : "");
-    const amt = rem <= 0 ? "✓" : (d.dir === "dois" ? "−" : "+") + money(rem);
-    const col = rem <= 0 ? "var(--green)" : (d.dir === "dois" ? "var(--red)" : "var(--label)");
-    return `<div class="rowitem" role="button" tabindex="0" onclick="openDebtSheet('${d.id}')"
-              aria-label="${esc(tt("Dette : {a}, {b}", { a: d.name, b: money(d.amount) }))}">
-      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.14)">${d.dir === "dois" ? "💸" : "🤝"}</div>
-      <div class="txt"><div class="n">${esc(d.name)}</div><div class="d">${esc(sub)}</div></div>
-      <div class="amt" style="color:${col}">${amt}</div>
-    </div>`;
-  };
-  const group = (dir, title) => {
-    const list = state.debts.filter(d => d.dir === dir).sort(byDebt);
-    if (!list.length) return "";
-    return `<div class="list-header" style="padding:14px 0 6px"><span class="t">${esc(title)}</span></div><div class="group">${list.map(debtRow).join("")}</div>`;
-  };
   document.getElementById("dettes-host").innerHTML = state.debts.length
-    ? group("dois", t("Je dois")) + group("me", t("On me doit"))
+    ? debGroupsHtml()
     : emptyState("🤝", t("Aucune dette pour le moment."), t("Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit."));
+}
+/* Carte dettes : dans un livre « dépenses », accès rapide aux dettes sans changer de livre (phase 2) */
+function renderDettesCard(){
+  const host = document.getElementById("dettes-host"); if (!host) return;
+  const tl = debtTotals(state.debts);
+  host.innerHTML = (state.debts.length
+    ? `<div class="hint" style="padding:0 0 6px">${esc(tt("Net : {a} · {n} dette(s)", { a: money(tl.net), n: state.debts.length }))}</div>` + debGroupsHtml()
+    : `<div class="hint" style="padding:2px 0 2px">${esc(t("Note un prêt ou une dette en un tap — pour un suivi complet, fais un livre 🤝 Dettes."))}</div>`);
 }
 /* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */
 /* --- Validation stricte des champs importés (anti-injection) ---

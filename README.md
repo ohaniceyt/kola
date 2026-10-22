@@ -1,4 +1,4 @@
-# Kola 💰 v0.5 — app PWA de suivi de dépenses
+# Kola 💰 v0.7 — app PWA de suivi de dépenses
 
 **Kola** (la noix de kola, symbole d'échange en Afrique de l'Ouest) — suivi de budget personnel, design iOS (Human Interface Guidelines), **100% local** : aucune donnée ne quitte l'appareil, jamais.
 
@@ -9,6 +9,8 @@
 ## Fonctionnalités
 - **Onboarding** : prénom, devise (Euro, **FCFA** sans décimales, Dollar CAD/US, Livre, CHF), budget mensuel *optionnel*, répartition conseillée en enveloppes
 - **Enveloppes budgétaires** par catégorie (barres colorées, dépassement signalé)
+- **Livres multiples** : autant de suivis que tu veux (Personnel, Maison…), chacun avec ses dépenses, enveloppes, objectifs, récurrences et même son **thème** — bascule en un tap depuis l'accueil ou Réglages → Livres ; le choix **📕 Dépenses / 🤝 Dettes** se fait à la création (et reste modifiable)
+- **Livre « Dettes » (v0.7)** : suis ce que tu dois (💸) et ce qu'on te doit (🤝) — montants, dates, échéances, **remboursements partiels** ; héros = dette nette + barre de progression globale, les dettes réglées descendent en liste avec ✓ ; disponible en backup JSON et fusion multi-appareils comme le reste
 - **Saisie ultra-rapide** : chips des dépenses fréquentes + pavé numérique maison sur mobile (pas de clavier système)
 - **Modifier/supprimer** : tap sur une dépense → fiche complète (avec **« Même dépense aujourd'hui »** en 1 tap) ; sur une catégorie, glisse à droite = modifier, à gauche = supprimer avec **réaffectation au choix** des dépenses et récurrences
 - **Récurrences** mensuelles ou **hebdomadaires**, ajoutées automatiquement — 1ʳᵉ occurrence toujours future (pas d'ajout rétroactif à la création), moteur sans doublon, même en ouvrant l'app une fois par mois ; **tap sur une récurrence pour la modifier** (montant, catégorie, fréquence, jour) ou l'arrêter

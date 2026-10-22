@@ -28,7 +28,7 @@ const todayISO = () => ymd(new Date());
 const amountFns = new Function(grab("function esc(", "function catOf") + "return { esc, parseAmount };")();
 const csvFns = new Function("DAY", grab("const CAT_HINTS", "let csvRows = null") + "return { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat };")(864e5);
 const CATS = { other:{label:"Autre",emoji:"📦",color:"#8e8e93"}, food:{label:"Alimentation",emoji:"🍔",color:"#ff9500"}, transport:{label:"Transport",emoji:"🚕",color:"#5ac8fa"} };
-const backupFns = new Function("SCHEMA_VERSION", "CATS", grab("/* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */", "let backupPending") + "return { buildBackup };")(3, CATS);
+const backupFns = new Function("SCHEMA_VERSION", "CATS", "todayISO", grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") + "return { buildBackup, normalizeDebts, debtRemain, debtTotals };")(3, CATS, todayISO);
 const ocr = new Function("state", grab("function parseAmount", "function catOf") +
   grab("const stripAccents", "function fillOcrCats") + "return { ocrExtract, ocrGuessCat, stripAccents };")(
   { cats: { food:{label:"Alimentation"}, transport:{label:"Transport"}, bills:{label:"Logement"}, fun:{label:"Loisirs"}, health:{label:"Santé et pharmacie"}, other:{label:"Autre"} } });
@@ -36,7 +36,7 @@ const recFns = new Function("ymd", "todayISO", "state", "save", grab("/* =======
 
 const { esc, parseAmount } = amountFns;
 const { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat } = csvFns;
-const { buildBackup } = backupFns;
+const { buildBackup, normalizeDebts, debtRemain, debtTotals } = backupFns;
 const { ocrExtract, ocrGuessCat } = ocr;
 const { nextOccur, firstOccur, processRecurring } = recFns;
 
@@ -177,7 +177,7 @@ const useST = obj => {
   return ST;
 };
 const coupleFns = new Function("SCHEMA_VERSION", "CATS", "state", "todayISO",
-  grab("/* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */", "let backupPending") +
+  grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") +
   grab("/* ============ Budget couple ============ */", "/* ====== Vue du soir") +
   "const LANG = \"fr\"; return { couple, remapWho, buildCoupleExport, coupleMergeInto, buildCoupleImport };"
 )(3, { other:{label:"Autre",emoji:"\ud83d\udce6",color:"#8e8e93"}, food:{label:"Alimentation",emoji:"\ud83c\udf54",color:"#ff9500"} }, ST, () => TODAY);
@@ -266,11 +266,19 @@ check(!threw, "byRecent : entrées null/undefined ne plantent pas");
 /* ======== Livres (multi-suivis) ======== */
 const docStub = { getElementById: () => ({ classList: { contains: () => false } }),
   documentElement: { style: { setProperty: () => {} } }, querySelectorAll: () => [] };
-const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", "t", "tt", "toast", "save", "render", "renderBookbar", "renderBooksRow", "document",
+const ndStub = l => Array.isArray(l)
+  ? l.filter(d => d && typeof d === "object").map(d => ({ ...d,
+      dir: d.dir === "me" ? "me" : "dois", amount: +d.amount || 0,
+      paid: Math.min(Math.max(0, +d.paid || 0), +d.amount || 0),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(d.date || "") ? d.date : "2026-10-22",
+      due: /^\d{4}-\d{2}-\d{2}$/.test(d.due || "") ? d.due : "" }))
+    .filter(d => d.amount > 0)
+  : [];
+const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", "t", "tt", "toast", "save", "render", "renderBookbar", "renderBooksRow", "document", "normalizeDebts",
   grab("/* ============ Livres (plusieurs suivis, un actif) ============ */", "function autoSplitBudget") +
-  "return { booksEnsure, bookStore, bookNew, bookSwitch, safeBookName, getBooks, curBook, bookDelete };")(
+  "return { booksEnsure, bookStore, bookNew, bookSwitch, bookAdd, bookRename };")(
   s, () => ({ other:{label:"Autre",emoji:"📦",color:"#8e8e93"} }), e => "📦", x => x, x => x, (k,o) => k, () => {}, () => {},
-  () => {}, () => {}, () => {}, docStub);
+  () => {}, () => {}, () => {}, docStub, ndStub);
 
 /* Migration : état plat → un livre « Personnel » qui reprend les données + remontée à plat */
 {
@@ -348,6 +356,70 @@ check(bakBooksTheme.books.find(b=>b.id==="b1").theme === "blue"
       && bakBooksTheme.theme === undefined,
       "buildBackup : thèmes par livre validés, hostile → absent, global absent → undefined");
 
+
+/* ======== Dettes : normalisation + totaux (livre type dettes) ======== */
+const T = "2026-10-22";
+const ndList = normalizeDebts([
+  { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed — moto", dir:"dois", amount:50000, date:"2026-10-01", paid:12000, due:"2026-11-30" },
+  { id:"<img src=x onerror>", name:"Kofi", dir:"me", amount:8000, date:"2026-10-05" },
+  { name:"sans montant", dir:"dois", amount:0, date:"2026-10-05" },
+  { name:"date pourrie", dir:"dois", amount:1000, date:"10/13/99" },
+  null, "texte"
+], T);
+eq(ndList.length, 3, "normalizeDebts : entrées invalides rejetées, date pourrie réparée (→ aujourd'hui)");
+eq(ndList[0].date, "2026-10-01", "normalizeDebts : date valide conservée");
+eq(ndList[2].date, T, "normalizeDebts : date invalide → aujourd'hui");
+
+const nd = normalizeDebts([
+  { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed", dir:"dois", amount:50000, date:"2026-10-01", paid:60000, due:"2026-13-99" },
+  { name:"Kofi", dir:"autre", amount:8000, date:"2026-10-05" }
+], T);
+eq(nd[0].paid, 50000, "normalizeDebts : paid borné à amount");
+eq(nd[0].due, "", "normalizeDebts : échéance invalide vidée");
+eq(nd[1].dir, "dois", "normalizeDebts : sens inconnu → « dois »");
+check(UUIDRE.test(nd[1].id), "normalizeDebts : id hostile → UUID");
+eq(debtRemain(nd[0]), 0, "debtRemain : remboursé total → reste 0");
+
+const debtsT = [
+  { name:"a", dir:"dois", amount:100, date:"2026-01-01", paid:40 },
+  { name:"b", dir:"dois", amount:50, date:"2026-01-02" },
+  { name:"c", dir:"me", amount:200, date:"2026-01-03", paid:200 }
+];
+const ttD = debtTotals(debtsT);
+eq(ttD.dois, 110, "debtTotals : reste « je dois » = 110");
+eq(ttD.me, 0, "debtTotals : reste « on me doit » = 0");
+eq(ttD.net, -110, "debtTotals : net = me − dois");
+eq(ttD.pct, 69, "debtTotals : % remboursé = 240/350 → 69");
+eq(debtTotals([]).pct, 0, "debtTotals : vide → % 0");
+eq(debtTotals(null).net, 0, "debtTotals : null → net 0");
+
+/* buildBackup : dettes du livre actif validées (whitelist anti-injection étendue) */
+const bakDettes = buildBackup({
+  v:3, bookId:"b2", rev:7,
+  books: [
+    { id:"b1", name:"Perso", data:{ expenses:[{ name:"a", cat:"food", amount:1, date:"2026-10-10" }] } },
+    { id:"b2", name:"Dettes", data:{ expenses:[], kind:"dettes", debts:[
+        { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed", dir:"dois", amount:500, date:"2026-10-01", paid:100, due:"2026-11-30" },
+        { id:")DROP--", name:"<img src=x onerror>", dir:"me", amount:200, date:"2026-10-01", paid:-50, due:"<b>x</b>" },
+        { name:"sans montant", dir:"dois", amount:0, date:"2026-10-01" } ] } }
+  ],
+  cats: { food:{ label:"Food", emoji:"🍔", color:"#ff9500" } }
+});
+const bd2 = bakDettes.books.find(b => b.id === "b2");
+eq(bd2.data.kind, "dettes", "buildBackup : type « dettes » du livre conservé");
+eq(bd2.data.debts.length, 2, "buildBackup : dette sans montant rejetée");
+eq(bd2.data.debts[0].paid, 100, "buildBackup : dette légitime conservée");
+eq(bd2.data.debts[1].paid, 0, "buildBackup : paid négatif → 0");
+eq(bd2.data.debts[1].due, "", "buildBackup : échéance hostile vidée");
+check(UUIDRE.test(bd2.data.debts[1].id), "buildBackup : id de dette hostile → UUID");
+eq(bd2.data.debts[1].dir, "me", "buildBackup : sens « me » conservé");
+eq(bakDettes.kind, "dettes", "buildBackup : livre actif remonté à plat avec son type");
+eq(bakDettes.debts.length, 2, "buildBackup : dettes du livre actif remontées à plat");
+check(bakDettes.books.find(b => b.id === "b1").data.kind === "dep"
+      && bakDettes.books.find(b => b.id === "b1").data.debts.length === 0,
+      "buildBackup : livre sans type → kind dep, dettes vides");
+check(bakDettes.expenses.length === 0 && bakDettes.books.find(b => b.id === "b1").data.expenses.length === 1,
+      "buildBackup : les dépenses des autres livres restent dans leur livre");
 
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

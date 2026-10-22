@@ -616,7 +616,12 @@
     <div id="goals"></div>
   </div>
 
-  <div class="card">
+  <div class="card" id="dettes-card" style="display:none">
+    <div class="list-header" style="padding:0 0 6px"><span class="t" style="font-size:17px" id="dettes-title">🤝 Dettes</span></div>
+    <div id="dettes-host"></div>
+  </div>
+
+  <div class="card" id="repart-card">
     <div class="list-header" style="padding:0 0 8px">
       <span class="t" style="font-size:17px">Répartition</span>
       <div class="segmented mini legend-mode" role="group" aria-label="Affichage des valeurs">
@@ -630,7 +635,7 @@
     </div>
   </div>
 
-  <div class="list-header">
+  <div class="list-header" id="recent-header">
     <span class="t">Récentes</span>
     <button onclick="switchTab('history')">Tout voir</button>
   </div>
@@ -869,7 +874,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.6</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.7</div></div>
   </div>
 </div>
 
@@ -1325,6 +1330,48 @@
   <button class="btn-ghost" onclick="closeBookSheet()" style="color:var(--secondary-label)">Fermer</button>
 </div>
 
+<div class="sheet" id="debt-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="debt-sheet-title">Nouvelle dette</h2>
+  <div class="field">
+    <label>Sens</label>
+    <div class="segmented mini" id="db-dir" role="group" aria-label="Sens de la dette">
+      <button class="on" data-k="dois" type="button">Je dois</button>
+      <button data-k="me" type="button">On me doit</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>Personne / Motif</label>
+    <input id="db-name" aria-label="Personne ou motif de la dette" type="text" maxlength="60" placeholder="Ex : Ahmed — moto">
+  </div>
+  <div class="field">
+    <label>Montant</label>
+    <div class="amount-input">
+      <span class="cur" id="db-cur">€</span>
+      <input id="db-amount" aria-label="Montant de la dette" type="text" inputmode="decimal" placeholder="0,00">
+    </div>
+  </div>
+  <div class="field">
+    <label>Date</label>
+    <input id="db-date" aria-label="Date de la dette" type="date">
+  </div>
+  <div class="field">
+    <label>Échéance (facultatif)</label>
+    <input id="db-due" aria-label="Échéance de la dette" type="date">
+  </div>
+  <div class="field" id="db-pay-field" style="display:none">
+    <label>Remboursement</label>
+    <div class="amount-input">
+      <span class="cur" id="db-pay-cur">€</span>
+      <input id="db-pay" aria-label="Montant du remboursement" type="text" inputmode="decimal" placeholder="0,00">
+    </div>
+    <button class="btn-primary" onclick="applyDebtPayment()" style="margin-top:10px">Enregistrer le paiement</button>
+  </div>
+  <button class="btn-primary" id="db-save" onclick="saveDebt()">Ajouter la dette</button>
+  <button class="btn-ghost" id="db-delete" onclick="delDebt()" style="display:none;color:var(--red)">Supprimer</button>
+  <button class="btn-ghost" onclick="closeDebtSheet()" style="color:var(--secondary-label)">Annuler</button>
+</div>
+
 <div class="sheet" id="theme-sheet" role="dialog" aria-modal="true">
   <div class="grabber"></div>
   <h2 id="theme-sheet-title">Thème</h2>
@@ -1400,6 +1447,8 @@ function stateInit(raw){
   if (!state.recurring) { state.recurring = []; }
   if (!state.goals) { state.goals = []; }
   if (!state.user) { state.user = { name:"" }; }
+  if (state.kind !== "dettes") state.kind = "dep";          // type du livre courant (dépenses par défaut)
+  if (!Array.isArray(state.debts)) state.debts = [];        // dettes du livre courant
   if (!state.couple) state.couple = { on:false, partner:"", sentIds:[], lastAt:"" };
   if (!Array.isArray(state.couple.sentIds)) state.couple.sentIds = [];
   if (typeof state.couple.on !== "boolean") state.couple.on = false;
@@ -1459,7 +1508,7 @@ function catDefaults(){
    et ses catégories ; le reste (profil, monnaie, couple, langue) reste global.
    Le livre courant est remonté dans `state` (champs à plat) : tout le code
    existant (stats, historique, vues, couple) lit l'état à plat sans le savoir. */
-const BOOK_FIELDS = ["budget","expenses","budgets","recurring","goals","cats"];
+const BOOK_FIELDS = ["budget","expenses","budgets","recurring","goals","cats","kind","debts"];
 const SAFE_BOOK_ID = /^[a-z0-9-]{1,24}$/i;
 /* Thèmes : l'accent (et les dégradés) par livre — ou global si le livre n'en définit pas */
 const THEMES = [
@@ -1490,10 +1539,11 @@ function safeBookName(n){
 }
 function getBooks(){ return Array.isArray(state.books) ? state.books.filter(b => b && typeof b === "object") : []; }
 let bookSeq = 0;
-function bookNew(name, emoji, id){
+function bookNew(name, emoji, id, kind){
   if (!id || !SAFE_BOOK_ID.test(id)) id = "b" + Date.now().toString(36) + (+(bookSeq++) + Math.floor(Math.random()*36)).toString(36);
   return { id, name: safeBookName(name), emoji: safeEmoji(emoji || "📖"),
-           data: { budget: 0, expenses: [], budgets: {}, recurring: [], goals: [], cats: catDefaults() } };
+           data: { budget: 0, expenses: [], budgets: {}, recurring: [], goals: [], cats: catDefaults(),
+                   kind: kind === "dettes" ? "dettes" : "dep", debts: [] } };
 }
 function curBook(){
   const bs = getBooks();
@@ -1510,7 +1560,9 @@ function booksEnsure(){
               budgets: (state.budgets && typeof state.budgets === "object" && !Array.isArray(state.budgets)) ? state.budgets : {},
               recurring: Array.isArray(state.recurring) ? state.recurring : [],
               goals: Array.isArray(state.goals) ? state.goals : [],
-              cats: catsOk(state.cats) ? state.cats : catDefaults() } }];
+              cats: catsOk(state.cats) ? state.cats : catDefaults(),
+              kind: state.kind === "dettes" ? "dettes" : "dep",
+              debts: normalizeDebts(state.debts) } }];
   }
   const seen = new Set();
   state.books = state.books.filter(b => b && typeof b === "object").map(b => {
@@ -1527,6 +1579,8 @@ function booksEnsure(){
     if (!Array.isArray(b.data.recurring)) b.data.recurring = [];
     if (!Array.isArray(b.data.goals)) b.data.goals = [];
     if (!catsOk(b.data.cats)) b.data.cats = catDefaults();
+    b.data.kind = (b.data.kind === "dettes") ? "dettes" : "dep";
+    b.data.debts = normalizeDebts(b.data.debts);
     return b;
   });
   if (!state.bookId || !seen.has(state.bookId)) state.bookId = state.books[0].id;
@@ -1538,7 +1592,8 @@ function booksEnsure(){
 function bookStore(){
   const b = curBook(); if (!b) return;
   b.data = { budget: +state.budget || 0, expenses: state.expenses, budgets: state.budgets,
-             recurring: state.recurring, goals: state.goals, cats: state.cats };
+             recurring: state.recurring, goals: state.goals, cats: state.cats,
+             kind: state.kind === "dettes" ? "dettes" : "dep", debts: state.debts };
 }
 function bookSwitch(id){
   const b = getBooks().find(x => x.id === id);
@@ -1550,9 +1605,9 @@ function bookSwitch(id){
   if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
   toast(b.emoji + " " + b.name);
 }
-function bookAdd(name, emoji){
+function bookAdd(name, emoji, kind){
   bookStore();
-  const b = bookNew(name, emoji);
+  const b = bookNew(name, emoji, null, kind);
   state.books.push(b);
   state.bookId = b.id;
   BOOK_FIELDS.forEach(f => { state[f] = b.data[f]; });
@@ -1560,10 +1615,16 @@ function bookAdd(name, emoji){
   if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
   toast(b.emoji + " " + b.name);
 }
-function bookRename(id, name, emoji){
+function bookRename(id, name, emoji, kind){
   const b = getBooks().find(x => x.id === id); if (!b) return;
   b.name = safeBookName(name);
   b.emoji = safeEmoji(emoji || b.emoji);
+  if ((kind === "dettes" || kind === "dep") && b.data.kind !== kind){
+    // Bascule de type : les données de l'ancien type restent intègres (cachées, pas perdues)
+    b.data.kind = kind;
+    if (id === state.bookId) state.kind = kind;
+    // si c'est un autre livre, le flat state le prendra à la prochaine bookSwitch
+  }
   save(); render(); renderBookbar(); renderBooksRow();
   if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
 }
@@ -1583,7 +1644,7 @@ function bookDelete(id){
 function renderBookbar(){
   const bar = document.getElementById("bookbar"); if (!bar) return;
   bar.innerHTML = getBooks().map(b =>
-    `<button class="book-chip${b.id === state.bookId ? " on" : ""}" onclick="bookSwitch('${b.id}')" aria-label="${esc(b.name)}">${esc(b.emoji)} ${esc(b.name)} <span class="cnt">${(b.data.expenses || []).length}</span></button>`
+    `<button class="book-chip${b.id === state.bookId ? " on" : ""}" onclick="bookSwitch('${b.id}')" aria-label="${esc(b.name)}">${esc(b.emoji)} ${esc(b.name)} <span class="cnt">${b.data.kind === "dettes" ? (b.data.debts || []).length : (b.data.expenses || []).length}</span></button>`
   ).join("") + `<button class="book-chip add" onclick="openBookSheet()" aria-label="${esc(t("Modifier les livres"))}">＋ ${esc(t("Livres"))}</button>`;
 }
 function renderBooksRow(){
@@ -1612,7 +1673,7 @@ const LEGAL = {
     ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
           "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
     ["h", "Version", "Version"],
-    ["p", "Kola v0.6 — dernière mise à jour : octobre 2026.", "Kola v0.5 — last updated: October 2026."],
+    ["p", "Kola v0.7 — dernière mise à jour : octobre 2026.", "Kola v0.7 — last updated: October 2026."],
   ],
   confidentialite: [
     ["h", "L'essentiel", "The essentials"],
@@ -1708,7 +1769,7 @@ function closeBookSheet(){ const s = document.getElementById("book-sheet");
   if (s){ s.classList.remove("show"); clearSheetOverlay(); } }
 function renderBookSheet(){
   const list = document.getElementById("book-list"); if (!list) return;
-  const editRow = (name, emoji) => `<div class="group" style="padding:8px 0">
+  const editRow = (name, emoji, kind) => `<div class="group" style="padding:8px 0">
     <div class="setrow" style="align-items:center">
       <input id="be-emoji" aria-label="Emoji du livre" type="text" maxlength="4" value="${esc(emoji)}"
              style="width:52px;padding:8px;text-align:center;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:17px;outline:none">
@@ -1716,19 +1777,26 @@ function renderBookSheet(){
              style="flex:1;padding:8px;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none" placeholder="${esc(t("Nom du livre"))}">
     </div>
     <div class="setrow">
+      <div class="segmented mini" style="flex:1" id="be-kindseg" role="group" aria-label="${esc(t("Type de livre"))}">
+        <button data-k="dep" type="button" class="${kind === "dettes" ? "" : "on"}" onclick="bookKindPick(this)">📕 ${esc(t("Dépenses"))}</button>
+        <button data-k="dettes" type="button" class="${kind === "dettes" ? "on" : ""}" onclick="bookKindPick(this)">🤝 ${esc(t("Dettes"))}</button>
+      </div>
+    </div>
+    <div class="setrow">
       <button class="btn-ghost" onclick="bookEditSave()" style="color:var(--link);font-weight:700">✓ ${esc(t("Enregistrer"))}</button>
       <button class="btn-ghost" onclick="bookEditCancel()" style="color:var(--secondary-label)">${esc(t("Annuler"))}</button>
     </div>
   </div>`;
-  const editNew = bookEditId === "new" ? editRow("", "📖") : "";
+  const editNew = bookEditId === "new" ? editRow("", "📖", "dep") : "";
   const rows = getBooks().map(b => {
-    if (b.id === bookEditId) return editRow(b.name, b.emoji);
-    const n = (b.data.expenses || []).length;
+    if (b.id === bookEditId) return editRow(b.name, b.emoji, b.data.kind);
+    const dettesB = b.data.kind === "dettes";
+    const n = dettesB ? (b.data.debts || []).length : (b.data.expenses || []).length;
     const trash = getBooks().length > 1 ? `<div class="rowbtn" onclick="event.stopPropagation();bookAskDelete('${b.id}')" role="button" tabindex="0">🗑️</div>` : "";
     return `<div class="setrow" style="cursor:pointer" onclick="bookSwitch('${b.id}')" role="button" tabindex="0">
       <div class="icon-badge" style="font-size:18px;background:var(--fill)">${esc(b.emoji)}</div>
       <div class="n">${esc(b.name)}${b.id === state.bookId ? ` <div class="bk-sub">${esc(t("Livre actuel"))}</div>` : ""}</div>
-      <div class="v">${tt("{n} dépense(s)", { n })}</div>
+      <div class="v">${dettesB ? tt("{n} dette(s)", { n }) : tt("{n} dépense(s)", { n })}</div>
       <div class="rowbtn" onclick="event.stopPropagation();bookSwitchEdit('${b.id}')" role="button" tabindex="0" aria-label="${esc(t("Renommer"))}">✏️</div>
       ${trash}
     </div>`;
@@ -1745,13 +1813,22 @@ function bookEditSave(){
   const n = (document.getElementById("be-name") || {}).value ?? "";
   const e = (document.getElementById("be-emoji") || {}).value ?? "";
   if (!String(n).trim()){ toast(t("Nom du livre")); return; }
-  if (bookEditId === "new") bookAdd(n, e); else bookRename(bookEditId, n, e);
+  const kb = document.querySelector("#be-kindseg button.on");
+  const kind = (kb && kb.dataset.k === "dettes") ? "dettes" : "dep";
+  if (bookEditId === "new") bookAdd(n, e, kind); else bookRename(bookEditId, n, e, kind);
   bookEditId = null;
+  renderBookSheet();   // efface le formulaire d'édition resté affiché après l'enregistrement
 }
 function bookEditCancel(){ bookEditId = null; renderBookSheet(); }
 function bookAskDelete(id){
   const b = getBooks().find(x => x.id === id); if (!b || getBooks().length <= 1) return;
-  if (confirm(tt("Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.", { a: b.name, n: (b.data.expenses || []).length }))) bookDelete(id);
+  if (b.data.kind === "dettes"){
+    if (confirm(tt("Supprimer le livre « {a} » et ses {n} dette(s) ? Action irréversible.", { a: b.name, n: (b.data.debts || []).length }))) bookDelete(id);
+  } else if (confirm(tt("Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.", { a: b.name, n: (b.data.expenses || []).length }))) bookDelete(id);
+}
+function bookKindPick(btn){
+  btn.parentElement.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+  btn.classList.add("on");
 }
 
 function autoSplitBudget(){
@@ -2352,6 +2429,32 @@ const I18N_EN = {
   "Ajouter un livre":"Add a book",
   "Chaque livre a ses dépenses, enveloppes et objectifs — bascule en un tap depuis l'accueil.":"Each book has its own expenses, envelopes and goals — switch with one tap from Home.",
   "Nouveau livre":"New book",
+  /* --- Livres / Dettes --- */
+  "Dettes":"Debts",
+  "🤝 Dettes":"🤝 Debts",
+  "Je dois":"I owe",
+  "On me doit":"They owe me",
+  "Je dois (net)":"I owe (net)",
+  "On me doit (net)":"Owed to me (net)",
+  "Type de livre":"Book type",
+  "📕 Dépenses":"📕 Expenses",
+  "Nouvelle dette":"New debt",
+  "Modifier la dette":"Edit debt",
+  "Personne / Motif":"Person / Reason",
+  "Échéance (facultatif)":"Due date (optional)",
+  "Ajouter la dette":"Add debt",
+  "Remboursement":"Repayment",
+  "Enregistrer le paiement":"Save payment",
+  "Dette ajoutée":"Debt added",
+  "Dette mise à jour":"Debt updated",
+  "Dette réglée":"Debt settled",
+  "Payée":"Repaid",
+  "Entre une personne ou un motif":"Enter a person or a reason",
+  "Entre une date valide":"Enter a valid date",
+  "Aucune dette pour le moment.":"No debt yet.",
+  "Tout est réglé 🎉":"All settled 🎉",
+  "Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit.":"Tap ＋ to track what you owe or what you're owed.",
+  "Supprimer":"Delete",
   "Nom du livre":"Book name",
   "Emoji du livre":"Book emoji",
   "Livre actuel":"Current book",
@@ -2537,6 +2640,17 @@ const I18N_EN = {
 };
 /* Chaînes paramétrées (l'EN remplace le gabarit, {x} remplacés par les params) */
 const I18N_EN_T = {
+  /* --- Dettes --- */
+  "{n} dette(s)":"{n} debt(s)",
+  "Dette : {a}, {b}":"Debt: {a}, {b}",
+  "Reste {a} · remboursé {p} %":"{a} left · {p}% repaid",
+  "Échéance {a}":"Due {a}",
+  "Je dois : {a}":"I owe: {a}",
+  "On me doit : {a}":"They owe me: {a}",
+  "Paiement de {a} enregistré":"Payment of {a} saved",
+  "Supprimer la dette « {a} » ({b}) ?":"Delete debt « {a} » ({b})?",
+  "Supprimer le livre « {a} » et ses {n} dette(s) ? Action irréversible.":"Delete book « {a} » and its {n} debt(s)? Irreversible.",
+  "🤝 {n} dette(s) fusionnée(s)":"🤝 {n} debt(s) merged",
   "Catégorie {a}, {b}, glisse à droite pour modifier, à gauche pour supprimer":"Category {a}, {b}, swipe right to edit, left to delete",
   "Dépense : {a}, {b}":"Expense: {a}, {b}",
   "Enveloppe mensuelle : {a}":"Monthly envelope: {a}",
@@ -2844,6 +2958,15 @@ function animateNumber(el, key, to, fmt){
   requestAnimationFrame(frame);
 }
 function renderHome(){
+  // Livre de type « dettes » : l'accueil bascule sur le suivi des dettes
+  const dettes = state.kind === "dettes";
+  ["couple-summary","envelopes-card","goals-card","repart-card"].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.style.display = dettes ? "none" : "";
+  });
+  const rh = document.getElementById("recent-header"), dc = document.getElementById("dettes-card");
+  if (rh) rh.style.display = dettes ? "none" : "";
+  if (dc) dc.style.display = dettes ? "" : "none";
+  if (dettes){ backupReminder(); renderDettesHome(); return; }
   const month = todayISO().slice(0,7);
   const spent = state.expenses.filter(e=>e.date.startsWith(month)).reduce((s,e)=>s+e.amount,0);
   const bud = catBudgetTotal() || state.budget;
@@ -3027,6 +3150,7 @@ function renderCatGrid(){
   });
 }
 function openSheet(){
+  if (state.kind === "dettes"){ openDebtSheet(); return; }
   document.getElementById("sheet-cur").textContent = state.currency;
   selectedChipCat = null;
   pickedWho = "me";
@@ -3114,7 +3238,7 @@ function clearSheetOverlay(){
 }
 function closeAllSheets(){
   closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet(); closeEveningSheet(); closeOcrSheet(); closeCoupleSheet(); pairClose(); closeExportSheet();
-  closeBookSheet(); closeThemeSheet(); closeAutoSheet(); closeLegalSheet();
+  closeBookSheet(); closeThemeSheet(); closeAutoSheet(); closeLegalSheet(); closeDebtSheet();
   closeOpenSwipe();
   clearSheetOverlay();
 }
@@ -3677,6 +3801,159 @@ async function exportBackup(){
   if (how === "shared") return;   // toast déjà envoyé par le partage
   toast("💾 Sauvegarde exportée");
 }
+/* ============ Dettes : modèle (fonctions pures) ============
+   Un livre de type « dettes » suit ce que tu dois et ce qu'on te doit.
+   Une dette = { id, name (personne ou motif), dir: "dois"|"me", amount,
+                 date, paid (total remboursé), due (échéance facultative) }. */
+function normalizeDebts(list, todayIso){
+  const okDate = s => SAFE_DATE.test(s || "") && !Number.isNaN(new Date(s + "T00:00:00").getTime());
+  const today = todayIso || todayISO();
+  if (!Array.isArray(list)) return [];
+  return list.filter(d => d && typeof d === "object").map(d => ({
+    id: safeId(d.id),
+    name: String(d.name ?? "").slice(0, 60).trim() || "…",
+    dir: d.dir === "me" ? "me" : "dois",
+    amount: +d.amount || 0,
+    date: okDate(d.date) ? d.date : today,
+    paid: Math.min(Math.max(0, +d.paid || 0), +d.amount || 0),
+    due: okDate(d.due) ? d.due : ""
+  })).filter(d => d.amount > 0);
+}
+function debtRemain(d){ return Math.max(0, (+d.amount || 0) - (+d.paid || 0)); }
+function debtTotals(debts){
+  const t = { dois: 0, me: 0, paidDois: 0, paidMe: 0, net: 0, pct: 0 };
+  (debts || []).filter(d => d && typeof d === "object").forEach(d => {
+    const rem = debtRemain(d);
+    if (d.dir === "me"){ t.me += rem; t.paidMe += +d.paid || 0; }
+    else { t.dois += rem; t.paidDois += +d.paid || 0; }
+  });
+  t.net = t.me - t.dois;
+  const orig = t.dois + t.me + t.paidDois + t.paidMe;
+  if (orig > 0) t.pct = Math.round(((t.paidDois + t.paidMe) / orig) * 100);
+  return t;
+}
+/* ============ Dettes : UI ============ */
+let debtEditId = null;
+function openDebtSheet(id){
+  debtEditId = id || null;
+  const d = state.debts.find(x => x.id === id);
+  document.getElementById("db-cur").textContent = state.currency;
+  document.getElementById("db-pay-cur").textContent = state.currency;
+  document.getElementById("db-name").value = d ? d.name : "";
+  document.getElementById("db-amount").value = d ? +d.amount.toFixed(2) : "";
+  document.getElementById("db-date").value = d ? d.date : todayISO();
+  document.getElementById("db-due").value = d ? (d.due || "") : "";
+  document.getElementById("db-pay").value = "";
+  document.getElementById("db-pay-field").style.display = d && debtRemain(d) > 0 ? "" : "none";
+  document.getElementById("db-delete").style.display = d ? "" : "none";
+  document.getElementById("db-save").textContent = d ? t("Enregistrer") : t("Ajouter la dette");
+  document.getElementById("debt-sheet-title").textContent = d ? t("Modifier la dette") : t("Nouvelle dette");
+  pickDebtDir(d ? d.dir : "dois");
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("debt-sheet").classList.add("show"); syncScrollLock();
+  if (!KP_TOUCH) setTimeout(()=>document.getElementById("db-name").focus(), 460);
+}
+function closeDebtSheet(){ document.getElementById("debt-sheet").classList.remove("show"); clearSheetOverlay(); syncScrollLock(); }
+function pickDebtDir(dir){ document.querySelectorAll("#db-dir button").forEach(b => b.classList.toggle("on", b.dataset.k === dir)); }
+function pickedDebtDir(){
+  const b = document.querySelector("#db-dir button.on");
+  return (b && b.dataset.k === "me") ? "me" : "dois";
+}
+function saveDebt(){
+  const n = document.getElementById("db-name").value.trim().slice(0, 60);
+  const a = parseAmount(document.getElementById("db-amount").value);
+  if (!a || a <= 0){ toast(t("Entre un montant valide")); return; }
+  if (!n){ toast(t("Entre une personne ou un motif")); return; }
+  const date = document.getElementById("db-date").value;
+  if (!SAFE_DATE.test(date)){ toast(t("Entre une date valide")); return; }
+  const dueRaw = document.getElementById("db-due").value;
+  const fields = { name: n, dir: pickedDebtDir(), amount: a, date,
+                   due: SAFE_DATE.test(dueRaw) ? dueRaw : "" };
+  if (debtEditId){
+    const d = state.debts.find(x => x.id === debtEditId); if (!d) return;
+    Object.assign(d, fields);
+    d.paid = Math.min(d.paid, d.amount);
+    toast("✓ " + t("Dette mise à jour"));
+  } else {
+    state.debts.push({ id: crypto.randomUUID(), ...fields, paid: 0 });
+    toast("✓ " + t("Dette ajoutée"));
+  }
+  closeDebtSheet(); save(); render();
+}
+function applyDebtPayment(){
+  const d = state.debts.find(x => x.id === debtEditId); if (!d) return;
+  const a = parseAmount(document.getElementById("db-pay").value);
+  const rem = debtRemain(d);
+  if (!a || a <= 0){ toast(t("Entre un montant valide")); return; }
+  const pay = Math.min(a, rem);
+  d.paid = +(d.paid + pay).toFixed(2);
+  if (debtRemain(d) <= 0) toast("🎉 " + t("Dette réglée"));
+  else toast("✓ " + tt("Paiement de {a} enregistré", { a: money(pay) }));
+  save(); closeDebtSheet(); render();
+}
+function delDebt(){
+  const d = state.debts.find(x => x.id === debtEditId); if (!d) return;
+  if (!confirm(tt("Supprimer la dette « {a} » ({b}) ?", { a: d.name, b: money(d.amount) }))) return;
+  state.debts = state.debts.filter(x => x.id !== debtEditId);
+  debtEditId = null;
+  closeDebtSheet(); save(); render();
+}
+function renderDettesHome(){
+  const tl = debtTotals(state.debts);
+  const labelEl = document.getElementById("hero-label");
+  const bar = document.getElementById("hero-bar");
+  if (!state.debts.length){
+    labelEl.textContent = t("Dettes");
+    animateNumber(document.getElementById("hero-remaining"), "hero-dt", 0, money);
+    document.getElementById("hero-spent").textContent = t("Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit.");
+    bar.style.visibility = "hidden";
+  } else if (tl.dois === 0 && tl.me === 0){
+    // toutes les dettes sont réglées
+    labelEl.textContent = t("Dettes");
+    animateNumber(document.getElementById("hero-remaining"), "hero-dt", 0, money);
+    document.getElementById("hero-spent").textContent = t("Tout est réglé 🎉");
+    bar.style.visibility = "visible";
+    bar.firstElementChild.style.width = "100%";
+    bar.firstElementChild.style.background = "#fff";
+  } else {
+    if (tl.net >= 0){ labelEl.textContent = t("On me doit (net)"); animateNumber(document.getElementById("hero-remaining"), "hero-dt", tl.net, money); }
+    else { labelEl.textContent = t("Je dois (net)"); animateNumber(document.getElementById("hero-remaining"), "hero-dt", -tl.net, money); }
+    document.getElementById("hero-spent").textContent =
+      (tl.dois ? tt("Je dois : {a}", { a: money(tl.dois) }) : "") +
+      (tl.dois && tl.me ? " · " : "") +
+      (tl.me ? tt("On me doit : {a}", { a: money(tl.me) }) : "");
+    bar.style.visibility = "visible";
+    bar.firstElementChild.style.width = tl.pct + "%";
+    bar.firstElementChild.style.background = "#fff";
+  }
+  const byDebt = (a, b) => (debtRemain(a) > 0 ? 0 : 1) - (debtRemain(b) > 0 ? 0 : 1)
+                          || String(b.date || "").localeCompare(String(a.date || ""));
+  const debtRow = d => {
+    const rem = debtRemain(d);
+    const pct = d.amount > 0 ? Math.min(100, Math.round(d.paid / d.amount * 100)) : 100;
+    const overdue = rem > 0 && d.due && d.due < todayISO();
+    const sub = rem <= 0 ? `✓ ${t("Payée")}`
+              : (overdue ? "⚠️ " : "") +
+                tt("Reste {a} · remboursé {p} %", { a: money(rem), p: pct }) +
+                (d.due ? " · " + tt("Échéance {a}", { a: overdue ? d.due : dayName(d.due) }) : "");
+    const amt = rem <= 0 ? "✓" : (d.dir === "dois" ? "−" : "+") + money(rem);
+    const col = rem <= 0 ? "var(--green)" : (d.dir === "dois" ? "var(--red)" : "var(--label)");
+    return `<div class="rowitem" role="button" tabindex="0" onclick="openDebtSheet('${d.id}')"
+              aria-label="${esc(tt("Dette : {a}, {b}", { a: d.name, b: money(d.amount) }))}">
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.14)">${d.dir === "dois" ? "💸" : "🤝"}</div>
+      <div class="txt"><div class="n">${esc(d.name)}</div><div class="d">${esc(sub)}</div></div>
+      <div class="amt" style="color:${col}">${amt}</div>
+    </div>`;
+  };
+  const group = (dir, title) => {
+    const list = state.debts.filter(d => d.dir === dir).sort(byDebt);
+    if (!list.length) return "";
+    return `<div class="list-header" style="padding:14px 0 6px"><span class="t">${esc(title)}</span></div><div class="group">${list.map(debtRow).join("")}</div>`;
+  };
+  document.getElementById("dettes-host").innerHTML = state.debts.length
+    ? group("dois", t("Je dois")) + group("me", t("On me doit"))
+    : emptyState("🤝", t("Aucune dette pour le moment."), t("Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit."));
+}
 /* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */
 /* --- Validation stricte des champs importés (anti-injection) ---
    Un fichier de sauvegarde vient de l'extérieur (Mail/WhatsApp) : tout ce qui
@@ -3729,7 +4006,9 @@ function buildLedger(s){
     budgets: budgetsOut,
     recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat: knownCat(r.cat) || "other", amount:+r.amount, freq:(r.freq||"m"), wd:+r.wd||0, day:Math.min(Math.max(+r.day||1,1),28), lastAdded: SAFE_DATE.test(r.lastAdded||"") ? r.lastAdded : "" })) : [],
     goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:safeId(g.id), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
-    expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date, who: (e.who==="partner" || e.who==="shared") ? e.who : "me", ts: (+e.ts && +e.ts > 1e12 && +e.ts < 9e15) ? +e.ts : 0}))
+    expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date, who: (e.who==="partner" || e.who==="shared") ? e.who : "me", ts: (+e.ts && +e.ts > 1e12 && +e.ts < 9e15) ? +e.ts : 0})),
+    kind: s.kind === "dettes" ? "dettes" : "dep",
+    debts: normalizeDebts(s.debts)
   };
 }
 function buildBackup(s){
@@ -3776,7 +4055,9 @@ function buildBackup(s){
       budgets: act.data.budgets,
       recurring: act.data.recurring,
       goals: act.data.goals,
-      expenses: act.data.expenses
+      expenses: act.data.expenses,
+      kind: act.data.kind,
+      debts: act.data.debts
     };
   }
   // Format à plat (sauvegardes d'avant les livres)
@@ -3795,7 +4076,9 @@ function buildBackup(s){
     goals: led.goals,
     user,
     couple,
-    expenses: led.expenses
+    expenses: led.expenses,
+    kind: led.kind,
+    debts: led.debts
   };
 }
 let backupPending = null;
@@ -4396,30 +4679,40 @@ function mergeLedgerInto(dst, src){
     if (!mine) dst.recurring.push(r);
     else if (r.lastAdded && r.lastAdded > (mine.lastAdded||"")) mine.lastAdded = r.lastAdded;
   });
-  return added;
+  let addedDebts = 0;
+  if (!Array.isArray(dst.debts)) dst.debts = [];
+  (src.debts||[]).forEach(d=>{
+    const mine = dst.debts.find(x=>x.id === d.id ||
+      (x.name===d.name && x.dir===d.dir && x.date===d.date && Math.abs(x.amount-d.amount)<0.005));
+    if (!mine){ dst.debts.push({...d}); addedDebts++; }
+    else if (d.paid > mine.paid) mine.paid = d.paid;   // reprise : le plus remboursé gagne
+  });
+  return { added, addedDebts };
 }
 function applyBackupMerge(){
   const bk = backupPending; if (!bk) return;
-  let added = 0;
+  let added = 0, addedDebts = 0;
   if (Array.isArray(bk.books) && bk.books.length){
     // Fichier multi-livres : fusion par id (sinon par nom, sinon nouveau livre)
     bk.books.forEach(sb=>{
       const data = sb.data || sb;
       const mine = state.books.find(x=>x.id===sb.id) || state.books.find(x=>x.name===sb.name);
       if (mine){
-        added += mergeLedgerInto(mine.data, data);
+        const r = mergeLedgerInto(mine.data, data);
+        added += r.added; addedDebts += r.addedDebts;
         if (!+mine.data.budget && +data.budget) mine.data.budget = +data.budget;
         if (sb.theme && !mine.theme) mine.theme = sb.theme;   // adopte le thème du livre importé
       } else {
         state.books.push({ id: sb.id, name: sb.name, emoji: sb.emoji, ...(sb.theme ? { theme: sb.theme } : {}),
           data: { budget:+data.budget||0, expenses:(data.expenses||[]).slice(), budgets:{...(data.budgets||{})},
-                  recurring:(data.recurring||[]).slice(), goals:(data.goals||[]).map(g=>({...g})), cats:{...(data.cats||{})} } });
+                  recurring:(data.recurring||[]).slice(), goals:(data.goals||[]).map(g=>({...g})), cats:{...(data.cats||{})},
+                  kind: data.kind === "dettes" ? "dettes" : "dep", debts:(data.debts||[]).map(d=>({...d})) } });
         added += (data.expenses||[]).length;
       }
     });
   } else {
     // Fichier à plat (ancien format) : fusion dans le livre courant
-    added = mergeLedgerInto({ expenses: state.expenses, cats: state.cats, budgets: state.budgets, goals: state.goals, recurring: state.recurring }, bk);
+    ({ added, addedDebts } = mergeLedgerInto({ expenses: state.expenses, cats: state.cats, budgets: state.budgets, goals: state.goals, recurring: state.recurring, debts: state.debts }, bk));
     if (!state.budget && bk.budget) state.budget = bk.budget;
   }
   if (!state.user.name && bk.user.name) state.user.name = bk.user.name;
@@ -4436,6 +4729,7 @@ function applyBackupMerge(){
   closeBackupSheet();
   save(); renderHistFilter(); switchTab("home"); render(); renderBookbar(); renderBooksRow();
   toast(tt("📥 {n} dépense(s) ajoutée(s) par fusion", {n: added}));
+  if (addedDebts) toast(tt("🤝 {n} dette(s) fusionnée(s)", {n: addedDebts}));
 }
 function applyBackupReplace(){
   const bk = backupPending; if (!bk) return;
@@ -4726,6 +5020,10 @@ document.getElementById("rec-freq").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
   setRecFreq(b.dataset.f);
 });
+document.getElementById("db-dir").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  pickDebtDir(b.dataset.k);
+});
 
 
 /* --- Budget couple --- */
@@ -4828,6 +5126,7 @@ enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
 enableSwipeClose(document.getElementById("couple-sheet"), closeCoupleSheet);
 enableSwipeClose(document.getElementById("pair-sheet"), pairClose);
 enableSwipeClose(document.getElementById("export-sheet"), closeExportSheet);
+enableSwipeClose(document.getElementById("debt-sheet"), closeDebtSheet);
 document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 
 // ---- Pavé numérique (écrans tactiles) ----

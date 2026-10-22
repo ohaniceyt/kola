@@ -2971,9 +2971,8 @@ function renderHome(){
   });
   const rh = document.getElementById("recent-header"), dc = document.getElementById("dettes-card");
   if (rh) rh.style.display = dettes ? "none" : "";
-  if (dc) dc.style.display = dettes ? "none" : "";   // livre dettes : le héros + les listes font déjà le travail
+  if (dc) dc.style.display = "";   // visible dans les deux types : héros dettes et/ou carte (le rendu diffère)
   if (dettes){ backupReminder(); renderDettesHome(); return; }
-  if (dc) dc.style.display = "";   // livre dépenses : carte dettes compacte (phase 2)
   const month = todayISO().slice(0,7);
   const spent = state.expenses.filter(e=>e.date.startsWith(month)).reduce((s,e)=>s+e.amount,0);
   const bud = catBudgetTotal() || state.budget;

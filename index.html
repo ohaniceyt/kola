@@ -104,6 +104,14 @@
     border-radius:50%; background: rgba(255,255,255,.12);
   }
   .hero.hero-me { margin: 12px 16px 8px; }
+  /* Mini héros dettes/créances (livres dépenses) : compact, chaque sens sa ligne */
+  .hero.hero-mini { margin: 10px 16px 8px; padding: 14px 18px 12px; }
+  .hero.hero-mini .mini-row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .hero.hero-mini .mini-row-2 { margin-top:8px; }
+  .hero.hero-mini .mini-l { font-size:13px; font-weight:600; letter-spacing:.02em; text-transform:uppercase; opacity:.92; }
+  .hero.hero-mini .mini-a { font-size:20px; font-weight:700; font-variant-numeric: tabular-nums; }
+  .hero.hero-mini .mini-bar { height:4px; border-radius:2px; background:rgba(255,255,255,.25); margin-top:5px; }
+  .hero.hero-mini .mini-bar > div { height:100%; border-radius:2px; background:#fff; transition:width .6s cubic-bezier(.32,.72,.33,1); }
   .hero::before {
     content:""; position:absolute; right:40px; bottom:-90px; width:180px; height:180px;
     border-radius:50%; background: rgba(255,255,255,.07);
@@ -585,8 +593,20 @@
     <div class="label" id="hero-label">Dépensé ce mois</div>
     <div class="amount" id="hero-remaining"></div>
     <div class="spent" id="hero-spent"></div>
-    <div class="spent" id="hero-dettes" style="display:none"></div>
     <div class="bar" id="hero-bar"><div></div></div>
+  </div>
+
+  <div class="hero hero-mini" id="hero-mini-w" style="display:none">
+    <div class="mini-row">
+      <span class="mini-l" id="mini-dois-l">💸 Je dois</span>
+      <span class="mini-a" id="mini-dois"></span>
+    </div>
+    <div class="mini-bar" id="mini-dois-bar"><div></div></div>
+    <div class="mini-row mini-row-2">
+      <span class="mini-l" id="mini-me-l">🤝 On me doit</span>
+      <span class="mini-a" id="mini-me"></span>
+    </div>
+    <div class="mini-bar" id="mini-me-bar"><div></div></div>
   </div>
 
   <div class="hero hero-me" id="hero-me-w" style="display:none">
@@ -2444,6 +2464,8 @@ const I18N_EN = {
   /* --- Livres / Dettes --- */
   "Dettes":"Debts",
   "🤝 Dettes":"🤝 Debts",
+  "💸 Je dois":"💸 I owe",
+  "🤝 On me doit":"🤝 They owe me",
   "Je dois":"I owe",
   "On me doit":"They owe me",
   "Type de livre":"Book type",
@@ -2977,14 +2999,17 @@ function renderHome(){
     const el = document.getElementById(id); if (el) el.style.display = dettes ? "none" : "";
   });
   const hmw = document.getElementById("hero-me-w"); if (hmw) hmw.style.display = dettes ? "" : "none";
-  // Héros des livres dépenses : les sommes des dettes/créances s'ajoutent au résumé du mois (jamais de net)
-  const hd = document.getElementById("hero-dettes");
-  if (hd){
-    const tlD = debtTotals(state.debts);
+  // Mini héros dettes/créances (livres dépenses seulement) : chaque sens sa ligne, jamais de net
+  const mini = document.getElementById("hero-mini-w");
+  if (mini){
     if (!dettes && state.debts.length){
-      hd.style.display = "";
-      hd.textContent = "🤝 " + tt("Je dois : {a} · On me doit : {b}", { a: money(tlD.dois), b: money(tlD.me) });
-    } else hd.style.display = "none";
+      const tlD = debtTotals(state.debts);
+      mini.style.display = "";
+      animateNumber(document.getElementById("mini-dois"), "mini-dois:" + state.currency, tlD.dois, money);
+      animateNumber(document.getElementById("mini-me"), "mini-me:" + state.currency, tlD.me, money);
+      document.getElementById("mini-dois-bar").firstElementChild.style.width = (tlD.dois ? tlD.pctDois : 100) + "%";
+      document.getElementById("mini-me-bar").firstElementChild.style.width = (tlD.me ? tlD.pctMe : 100) + "%";
+    } else mini.style.display = "none";
   }
   const rh = document.getElementById("recent-header"), dc = document.getElementById("dettes-card");
   if (rh) rh.style.display = dettes ? "none" : "";

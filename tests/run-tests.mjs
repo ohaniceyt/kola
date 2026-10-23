@@ -390,6 +390,8 @@ eq(ttD.dois, 110, "debtTotals : reste « je dois » = 110");
 eq(ttD.me, 0, "debtTotals : reste « on me doit » = 0");
 eq(ttD.net, -110, "debtTotals : net = me − dois");
 eq(ttD.pct, 69, "debtTotals : % remboursé = 240/350 → 69");
+eq(ttD.pctDois, 27, "debtTotals : % remboursé « je dois » = 40/150 → 27");
+eq(ttD.pctMe, 100, "debtTotals : % remboursé « on me doit » = 200/200 → 100");
 eq(debtTotals([]).pct, 0, "debtTotals : vide → % 0");
 eq(debtTotals(null).net, 0, "debtTotals : null → net 0");
 

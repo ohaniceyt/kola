@@ -103,6 +103,7 @@
     content:""; position:absolute; right:-40px; top:-60px; width:220px; height:220px;
     border-radius:50%; background: rgba(255,255,255,.12);
   }
+  .hero.hero-me { margin: 12px 16px 8px; }
   .hero::before {
     content:""; position:absolute; right:40px; bottom:-90px; width:180px; height:180px;
     border-radius:50%; background: rgba(255,255,255,.07);
@@ -585,6 +586,13 @@
     <div class="amount" id="hero-remaining"></div>
     <div class="spent" id="hero-spent"></div>
     <div class="bar" id="hero-bar"><div></div></div>
+  </div>
+
+  <div class="hero hero-me" id="hero-me-w" style="display:none">
+    <div class="label" id="hero-me-label">🤝 On me doit</div>
+    <div class="amount" id="hero-me-amount"></div>
+    <div class="spent" id="hero-me-sub"></div>
+    <div class="bar" id="hero-me-bar"><div></div></div>
   </div>
 
   <div class="card" id="backup-card" style="display:none">
@@ -2437,8 +2445,6 @@ const I18N_EN = {
   "🤝 Dettes":"🤝 Debts",
   "Je dois":"I owe",
   "On me doit":"They owe me",
-  "Je dois (net)":"I owe (net)",
-  "On me doit (net)":"Owed to me (net)",
   "Type de livre":"Book type",
   "📕 Dépenses":"📕 Expenses",
   "Nouvelle dette":"New debt",
@@ -2646,16 +2652,16 @@ const I18N_EN = {
 const I18N_EN_T = {
   /* --- Dettes --- */
   "{n} dette(s)":"{n} debt(s)",
+  "Remboursé : {a} · {p} %":"Repaid: {a} · {p}%",
+  "Encaissé : {a} · {p} %":"Received: {a} · {p}%",
+  "Je dois : {a} · On me doit : {b}":"I owe: {a} · They owe me: {b}",
   "Dette : {a}, {b}":"Debt: {a}, {b}",
   "Reste {a} · remboursé {p} %":"{a} left · {p}% repaid",
   "Échéance {a}":"Due {a}",
-  "Je dois : {a}":"I owe: {a}",
-  "On me doit : {a}":"They owe me: {a}",
   "Paiement de {a} enregistré":"Payment of {a} saved",
   "Supprimer la dette « {a} » ({b}) ?":"Delete debt « {a} » ({b})?",
   "Supprimer le livre « {a} » et ses {n} dette(s) ? Action irréversible.":"Delete book « {a} » and its {n} debt(s)? Irreversible.",
   "🤝 {n} dette(s) fusionnée(s)":"🤝 {n} debt(s) merged",
-  "Net : {a} · {n} dette(s)":"Net: {a} · {n} debt(s)",
   "Note un prêt ou une dette en un tap — pour un suivi complet, fais un livre 🤝 Dettes.":"Log a loan or debt in one tap — for full tracking, make a 🤝 Debts book.",
   "Catégorie {a}, {b}, glisse à droite pour modifier, à gauche pour supprimer":"Category {a}, {b}, swipe right to edit, left to delete",
   "Dépense : {a}, {b}":"Expense: {a}, {b}",
@@ -2969,6 +2975,7 @@ function renderHome(){
   ["couple-summary","envelopes-card","goals-card","repart-card"].forEach(id=>{
     const el = document.getElementById(id); if (el) el.style.display = dettes ? "none" : "";
   });
+  const hmw = document.getElementById("hero-me-w"); if (hmw) hmw.style.display = dettes ? "" : "none";
   const rh = document.getElementById("recent-header"), dc = document.getElementById("dettes-card");
   if (rh) rh.style.display = dettes ? "none" : "";
   if (dc) dc.style.display = "";   // visible dans les deux types : héros dettes et/ou carte (le rendu diffère)
@@ -3828,13 +3835,19 @@ function normalizeDebts(list, todayIso){
 }
 function debtRemain(d){ return Math.max(0, (+d.amount || 0) - (+d.paid || 0)); }
 function debtTotals(debts){
-  const t = { dois: 0, me: 0, paidDois: 0, paidMe: 0, net: 0, pct: 0 };
+  const t = { dois: 0, me: 0, paidDois: 0, paidMe: 0, net: 0, pct: 0, pctDois: 0, pctMe: 0 };
   (debts || []).filter(d => d && typeof d === "object").forEach(d => {
     const rem = debtRemain(d);
     if (d.dir === "me"){ t.me += rem; t.paidMe += +d.paid || 0; }
     else { t.dois += rem; t.paidDois += +d.paid || 0; }
   });
   t.net = t.me - t.dois;
+  const pctDir = (rem, paid) => {
+    const orig = rem + paid;
+    return orig > 0 ? Math.round((paid / orig) * 100) : 0;
+  };
+  t.pctDois = pctDir(t.dois, t.paidDois);
+  t.pctMe = pctDir(t.me, t.paidMe);
   const orig = t.dois + t.me + t.paidDois + t.paidMe;
   if (orig > 0) t.pct = Math.round(((t.paidDois + t.paidMe) / orig) * 100);
   return t;
@@ -3935,33 +3948,39 @@ function debGroupsHtml(){
   };
   return group("dois", t("Je dois")) + group("me", t("On me doit"));
 }
+/* Héros dettes : chaque sens sur sa propre ligne — jamais de net mélange dettes/créances */
 function renderDettesHome(){
   const tl = debtTotals(state.debts);
   const labelEl = document.getElementById("hero-label");
   const bar = document.getElementById("hero-bar");
+  const meW = document.getElementById("hero-me-w");
   if (!state.debts.length){
     labelEl.textContent = t("Dettes");
     animateNumber(document.getElementById("hero-remaining"), "hero-dt", 0, money);
     document.getElementById("hero-spent").textContent = t("Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit.");
     bar.style.visibility = "hidden";
-  } else if (tl.dois === 0 && tl.me === 0){
-    // toutes les dettes sont réglées
-    labelEl.textContent = t("Dettes");
-    animateNumber(document.getElementById("hero-remaining"), "hero-dt", 0, money);
-    document.getElementById("hero-spent").textContent = t("Tout est réglé 🎉");
-    bar.style.visibility = "visible";
-    bar.firstElementChild.style.width = "100%";
-    bar.firstElementChild.style.background = "#fff";
+    meW.style.display = "none";
   } else {
-    if (tl.net >= 0){ labelEl.textContent = t("On me doit (net)"); animateNumber(document.getElementById("hero-remaining"), "hero-dt", tl.net, money); }
-    else { labelEl.textContent = t("Je dois (net)"); animateNumber(document.getElementById("hero-remaining"), "hero-dt", -tl.net, money); }
-    document.getElementById("hero-spent").textContent =
-      (tl.dois ? tt("Je dois : {a}", { a: money(tl.dois) }) : "") +
-      (tl.dois && tl.me ? " · " : "") +
-      (tl.me ? tt("On me doit : {a}", { a: money(tl.me) }) : "");
+    // Ligne 1 : ce que tu dois
+    labelEl.textContent = "💸 " + t("Je dois");
+    animateNumber(document.getElementById("hero-remaining"), "hero-dt", tl.dois, money);
+    document.getElementById("hero-spent").textContent = tl.dois
+      ? tt("Remboursé : {a} · {p} %", { a: money(tl.paidDois), p: tl.pctDois })
+      : "✓ " + t("Tout est réglé 🎉");
     bar.style.visibility = "visible";
-    bar.firstElementChild.style.width = tl.pct + "%";
+    bar.firstElementChild.style.width = (tl.dois ? tl.pctDois : 100) + "%";
     bar.firstElementChild.style.background = "#fff";
+    // Ligne 2 : ce qu'on te doit
+    meW.style.display = "";
+    document.getElementById("hero-me-label").textContent = "🤝 " + t("On me doit");
+    animateNumber(document.getElementById("hero-me-amount"), "hero-dt-me", tl.me, money);
+    document.getElementById("hero-me-sub").textContent = tl.me
+      ? tt("Encaissé : {a} · {p} %", { a: money(tl.paidMe), p: tl.pctMe })
+      : "✓ " + t("Tout est réglé 🎉");
+    const mb = document.getElementById("hero-me-bar");
+    mb.style.visibility = "visible";
+    mb.firstElementChild.style.width = (tl.me ? tl.pctMe : 100) + "%";
+    mb.firstElementChild.style.background = "#fff";
   }
   document.getElementById("dettes-host").innerHTML = state.debts.length
     ? debGroupsHtml()
@@ -3972,7 +3991,7 @@ function renderDettesCard(){
   const host = document.getElementById("dettes-host"); if (!host) return;
   const tl = debtTotals(state.debts);
   host.innerHTML = (state.debts.length
-    ? `<div class="hint" style="padding:0 0 6px">${esc(tt("Net : {a} · {n} dette(s)", { a: money(tl.net), n: state.debts.length }))}</div>` + debGroupsHtml()
+    ? `<div class="hint" style="padding:0 0 6px">${esc(tt("Je dois : {a} · On me doit : {b}", { a: money(tl.dois), b: money(tl.me) }))}</div>` + debGroupsHtml()
     : `<div class="hint" style="padding:2px 0 2px">${esc(t("Note un prêt ou une dette en un tap — pour un suivi complet, fais un livre 🤝 Dettes."))}</div>`);
 }
 /* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */

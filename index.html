@@ -585,6 +585,7 @@
     <div class="label" id="hero-label">Dépensé ce mois</div>
     <div class="amount" id="hero-remaining"></div>
     <div class="spent" id="hero-spent"></div>
+    <div class="spent" id="hero-dettes" style="display:none"></div>
     <div class="bar" id="hero-bar"><div></div></div>
   </div>
 
@@ -2976,6 +2977,15 @@ function renderHome(){
     const el = document.getElementById(id); if (el) el.style.display = dettes ? "none" : "";
   });
   const hmw = document.getElementById("hero-me-w"); if (hmw) hmw.style.display = dettes ? "" : "none";
+  // Héros des livres dépenses : les sommes des dettes/créances s'ajoutent au résumé du mois (jamais de net)
+  const hd = document.getElementById("hero-dettes");
+  if (hd){
+    const tlD = debtTotals(state.debts);
+    if (!dettes && state.debts.length){
+      hd.style.display = "";
+      hd.textContent = "🤝 " + tt("Je dois : {a} · On me doit : {b}", { a: money(tlD.dois), b: money(tlD.me) });
+    } else hd.style.display = "none";
+  }
   const rh = document.getElementById("recent-header"), dc = document.getElementById("dettes-card");
   if (rh) rh.style.display = dettes ? "none" : "";
   if (dc) dc.style.display = "";   // visible dans les deux types : héros dettes et/ou carte (le rendu diffère)

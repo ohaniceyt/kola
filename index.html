@@ -2677,7 +2677,6 @@ const I18N_EN_T = {
   "{n} dette(s)":"{n} debt(s)",
   "Remboursé : {a} · {p} %":"Repaid: {a} · {p}%",
   "Encaissé : {a} · {p} %":"Received: {a} · {p}%",
-  "Je dois : {a} · On me doit : {b}":"I owe: {a} · They owe me: {b}",
   "Dette : {a}, {b}":"Debt: {a}, {b}",
   "Reste {a} · remboursé {p} %":"{a} left · {p}% repaid",
   "Échéance {a}":"Due {a}",
@@ -4024,9 +4023,8 @@ function renderDettesHome(){
 /* Carte dettes : dans un livre « dépenses », accès rapide aux dettes sans changer de livre (phase 2) */
 function renderDettesCard(){
   const host = document.getElementById("dettes-host"); if (!host) return;
-  const tl = debtTotals(state.debts);
   host.innerHTML = (state.debts.length
-    ? `<div class="hint" style="padding:0 0 6px">${esc(tt("Je dois : {a} · On me doit : {b}", { a: money(tl.dois), b: money(tl.me) }))}</div>` + debGroupsHtml()
+    ? debGroupsHtml()
     : `<div class="hint" style="padding:2px 0 2px">${esc(t("Note un prêt ou une dette en un tap — pour un suivi complet, fais un livre 🤝 Dettes."))}</div>`);
 }
 /* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */

@@ -906,7 +906,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.8</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.9</div></div>
   </div>
 </div>
 
@@ -1399,6 +1399,10 @@
     </div>
     <button class="btn-primary" onclick="applyDebtPayment()" style="margin-top:10px">Enregistrer le paiement</button>
   </div>
+  <div class="field" id="db-pays-field" style="display:none">
+    <label>Historique des remboursements</label>
+    <div id="db-pays" style="margin:0"></div>
+  </div>
   <button class="btn-primary" id="db-save" onclick="saveDebt()">Ajouter la dette</button>
   <button class="btn-ghost" id="db-delete" onclick="delDebt()" style="display:none;color:var(--red)">Supprimer</button>
   <button class="btn-ghost" onclick="closeDebtSheet()" style="color:var(--secondary-label)">Annuler</button>
@@ -1705,7 +1709,7 @@ const LEGAL = {
     ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
           "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
     ["h", "Version", "Version"],
-    ["p", "Kola v0.8 — dernière mise à jour : octobre 2026.", "Kola v0.8 — last updated: October 2026."],
+    ["p", "Kola v0.9 — dernière mise à jour : octobre 2026.", "Kola v0.9 — last updated: October 2026."],
   ],
   confidentialite: [
     ["h", "L'essentiel", "The essentials"],
@@ -2301,6 +2305,12 @@ const I18N_WD = () => LANG==="en"
       aucun data-i18n à maintenir dans le markup.
 */
 const I18N_EN = {
+  /* --- Dettes : historique --- */
+  "Remboursements":"Repayments",
+  "Historique des remboursements":"Payment history",
+  "Remboursement":"Repayment",
+  "Supprimer le remboursement":"Delete the repayment",
+  "Remboursement supprimé":"Repayment deleted",
   /* --- Accueil --- */
   "Dépensé ce mois":"Spent this month",
   "💾 Sauvegarde conseillée":"💾 Backup recommended",
@@ -2466,6 +2476,7 @@ const I18N_EN = {
   "🤝 Dettes":"🤝 Debts",
   "💸 Je dois":"💸 I owe",
   "🤝 On me doit":"🤝 They owe me",
+  "🔁 Remboursements":"🔁 Repayments",
   "Je dois":"I owe",
   "On me doit":"They owe me",
   "Type de livre":"Book type",
@@ -2675,6 +2686,9 @@ const I18N_EN = {
 const I18N_EN_T = {
   /* --- Dettes --- */
   "{n} dette(s)":"{n} debt(s)",
+  "{n} entrée(s)":"{n} item(s)",
+  "Remboursement · {a}":"Repayment · {a}",
+  "Supprimer ce remboursement ({a} du {b}) ?":"Delete this repayment ({a} on {b})?",
   "Remboursé : {a} · {p} %":"Repaid: {a} · {p}%",
   "Encaissé : {a} · {p} %":"Received: {a} · {p}%",
   "Dette : {a}, {b}":"Debt: {a}, {b}",
@@ -3298,6 +3312,15 @@ let newEmoji = '📦', newColor = COLORS[0];
 
 function renderHistFilter(){
   const seg = document.getElementById("hist-filter");
+  if (state.kind === "dettes"){
+    // Livre dettes : filtres Tout / Je dois / On me doit / Remboursements
+    let cur = seg.dataset.c || "all";
+    if (!["all","dois","me","pays"].includes(cur)) cur = "all";
+    seg.dataset.c = cur;
+    seg.innerHTML = [["all", t("Tout")], ["dois", "💸 " + t("Je dois")], ["me", "🤝 " + t("On me doit")], ["pays", "🔁 " + t("Remboursements")]]
+      .map(([k,l]) => `<button class="${k===cur?'on':''}" data-c="${k}">${esc(l)}</button>`).join("");
+    return;
+  }
   let cur = seg.dataset.c || "all";
   if (cur !== "all" && !state.cats[cur]) cur = "all";
   seg.dataset.c = cur;
@@ -3852,7 +3875,8 @@ async function exportBackup(){
 /* ============ Dettes : modèle (fonctions pures) ============
    Un livre de type « dettes » suit ce que tu dois et ce qu'on te doit.
    Une dette = { id, name (personne ou motif), dir: "dois"|"me", amount,
-                 date, paid (total remboursé), due (échéance facultative) }. */
+                 date, paid (total remboursé), due (échéance facultative),
+                 payments[] = journal des remboursements {id, date, amount} }. */
 function normalizeDebts(list, todayIso){
   const okDate = s => SAFE_DATE.test(s || "") && !Number.isNaN(new Date(s + "T00:00:00").getTime());
   const today = todayIso || todayISO();
@@ -3864,7 +3888,12 @@ function normalizeDebts(list, todayIso){
     amount: +d.amount || 0,
     date: okDate(d.date) ? d.date : today,
     paid: Math.min(Math.max(0, +d.paid || 0), +d.amount || 0),
-    due: okDate(d.due) ? d.due : ""
+    due: okDate(d.due) ? d.due : "",
+    payments: Array.isArray(d.payments)
+      ? d.payments.filter(p => p && typeof p === "object" && +p.amount > 0)
+        .map(p => ({ id: safeId(p.id), date: okDate(p.date) ? p.date : today, amount: +p.amount }))
+        .filter(p => p.amount > 0)
+      : []
   })).filter(d => d.amount > 0);
 }
 function debtRemain(d){ return Math.max(0, (+d.amount || 0) - (+d.paid || 0)); }
@@ -3886,6 +3915,20 @@ function debtTotals(debts){
   if (orig > 0) t.pct = Math.round(((t.paidDois + t.paidMe) / orig) * 100);
   return t;
 }
+/* Chronologie unifiée (dettes + créances + remboursements) — pure, testée.
+   Tri : date desc, puis les dettes/créances avant les remboursements du même jour. */
+function debtLedgerEntries(debts){
+  const out = [];
+  (debts || []).filter(d => d && typeof d === "object").forEach(d => {
+    (d.payments || []).filter(p => p && typeof p === "object").forEach(p => {
+      out.push({ t: "pay", id: p.id, debtId: d.id, name: d.name, dir: d.dir, amount: +p.amount || 0, date: p.date, due: "" });
+    });
+    out.push({ t: "debt", id: d.id, debtId: d.id, name: d.name, dir: d.dir, amount: +d.amount || 0, date: d.date, due: d.due || "" });
+  });
+  return out.sort((a, b) => String(b.date).localeCompare(String(a.date))
+    || (a.t === "pay" ? 1 : 0) - (b.t === "pay" ? 1 : 0)
+    || String(a.name).localeCompare(String(b.name)));
+}
 /* ============ Dettes : UI ============ */
 let debtEditId = null;
 function openDebtSheet(id){
@@ -3902,6 +3945,7 @@ function openDebtSheet(id){
   document.getElementById("db-delete").style.display = d ? "" : "none";
   document.getElementById("db-save").textContent = d ? t("Enregistrer") : t("Ajouter la dette");
   document.getElementById("debt-sheet-title").textContent = d ? t("Modifier la dette") : t("Nouvelle dette");
+  renderDebtPays(d);
   pickDebtDir(d ? d.dir : "dois");
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   document.getElementById("debt-sheet").classList.add("show"); syncScrollLock();
@@ -3940,10 +3984,35 @@ function applyDebtPayment(){
   const rem = debtRemain(d);
   if (!a || a <= 0){ toast(t("Entre un montant valide")); return; }
   const pay = Math.min(a, rem);
+  d.payments = Array.isArray(d.payments) ? d.payments : [];
+  d.payments.push({ id: crypto.randomUUID(), date: todayISO(), amount: pay });   // journal (historique)
   d.paid = +(d.paid + pay).toFixed(2);
   if (debtRemain(d) <= 0) toast("🎉 " + t("Dette réglée"));
   else toast("✓ " + tt("Paiement de {a} enregistré", { a: money(pay) }));
   save(); closeDebtSheet(); render();
+}
+/* Journal des remboursements d'une dette : suppression d'une entrée (paid suit) */
+function delDebtPay(debtId, payId){
+  const d = state.debts.find(x => x.id === debtId); if (!d || !Array.isArray(d.payments)) return;
+  const p = d.payments.find(x => x.id === payId); if (!p) return;
+  if (!confirm(tt("Supprimer ce remboursement ({a} du {b}) ?", { a: money(p.amount), b: dayName(p.date) }))) return;
+  d.payments = d.payments.filter(x => x.id !== payId);
+  d.paid = Math.max(0, +(d.paid - p.amount).toFixed(2));
+  toast("🗑️ " + t("Remboursement supprimé"));
+  save(); render(); openDebtSheet(debtId);
+}
+function renderDebtPays(d){
+  const field = document.getElementById("db-pays-field");
+  const host = document.getElementById("db-pays"); if (!field || !host) return;
+  const pays = (d && Array.isArray(d.payments)) ? [...d.payments].sort((a, b) => String(b.date).localeCompare(String(a.date))) : [];
+  field.style.display = pays.length ? "" : "none";
+  host.innerHTML = pays.map(p =>
+    `<div class="setrow">
+      <div class="icon-badge" style="background:rgba(52,199,89,.16)">🔁</div>
+      <div class="n">${esc(tt("Remboursement · {a}", { a: dayName(p.date) }))}</div>
+      <div class="v" style="color:var(--green)">${money(p.amount)}</div>
+      <div class="rowbtn" onclick="delDebtPay('${d.id}','${p.id}')" role="button" tabindex="0" aria-label="${esc(t("Supprimer le remboursement"))}">🗑️</div>
+    </div>`).join("");
 }
 function delDebt(){
   const d = state.debts.find(x => x.id === debtEditId); if (!d) return;
@@ -4757,8 +4826,15 @@ function mergeLedgerInto(dst, src){
   (src.debts||[]).forEach(d=>{
     const mine = dst.debts.find(x=>x.id === d.id ||
       (x.name===d.name && x.dir===d.dir && x.date===d.date && Math.abs(x.amount-d.amount)<0.005));
-    if (!mine){ dst.debts.push({...d}); addedDebts++; }
-    else if (d.paid > mine.paid) mine.paid = d.paid;   // reprise : le plus remboursé gagne
+    if (!mine){ dst.debts.push({ ...d, payments: (d.payments||[]).map(p=>({...p})) }); addedDebts++; }
+    else {
+      if (d.paid > mine.paid) mine.paid = d.paid;   // reprise : le plus remboursé gagne
+      // journal des remboursements : union par id de paiement
+      if (Array.isArray(d.payments) && d.payments.length){
+        if (!Array.isArray(mine.payments)) mine.payments = [];
+        d.payments.forEach(p => { if (p && !mine.payments.some(x => x.id === p.id)) mine.payments.push({ ...p }); });
+      }
+    }
   });
   return { added, addedDebts };
 }
@@ -4779,7 +4855,7 @@ function applyBackupMerge(){
         state.books.push({ id: sb.id, name: sb.name, emoji: sb.emoji, ...(sb.theme ? { theme: sb.theme } : {}),
           data: { budget:+data.budget||0, expenses:(data.expenses||[]).slice(), budgets:{...(data.budgets||{})},
                   recurring:(data.recurring||[]).slice(), goals:(data.goals||[]).map(g=>({...g})), cats:{...(data.cats||{})},
-                  kind: data.kind === "dettes" ? "dettes" : "dep", debts:(data.debts||[]).map(d=>({...d})) } });
+                  kind: data.kind === "dettes" ? "dettes" : "dep", debts:(data.debts||[]).map(d=>({...d, payments:(d.payments||[]).map(p=>({...p}))})) } });
         added += (data.expenses||[]).length;
       }
     });
@@ -4867,7 +4943,56 @@ function exportCSV(){
 }
 const HIST_PAGE = 200;
 let histShown = HIST_PAGE;
+/* Historique d'un livre dettes : chronologie dettes/créances + remboursements */
+function applyDebtHistoryFilter(){
+  const f = document.getElementById("hist-filter").dataset.c || "all";
+  const q = (document.getElementById("hist-search").value || "").toLowerCase().trim();
+  let items = debtLedgerEntries(state.debts);
+  if (f === "dois") items = items.filter(e => e.dir === "dois");
+  else if (f === "me") items = items.filter(e => e.dir === "me");
+  else if (f === "pays") items = items.filter(e => e.t === "pay");
+  if (q) items = items.filter(e => e.name.toLowerCase().includes(q));
+  document.getElementById("history-sub").textContent = tt("{n} entrée(s)", { n: items.length })
+    + (f === "pays" && items.length ? " · " + money(items.reduce((s,e)=>s+e.amount,0)) : "");
+  const shown = items.slice(0, histShown);
+  renderDebtHistoryList(shown);
+  if (items.length > shown.length){
+    const host = document.getElementById("history-list");
+    const btn = document.createElement("button");
+    btn.className = "btn-ghost"; btn.style.margin = "8px 16px 0"; btn.style.width = "calc(100% - 32px)";
+    btn.textContent = tt("Afficher plus ({n} restantes)", { n: items.length - shown.length });
+    btn.onclick = () => { histShown += HIST_PAGE; applyDebtHistoryFilter(); };
+    host.appendChild(btn);
+  }
+}
+function renderDebtHistoryList(items){
+  const host = document.getElementById("history-list");
+  if (!items.length){
+    host.innerHTML = emptyState("🤝", t("Aucune dette pour le moment."),
+      t("Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit."));
+    return;
+  }
+  const groups = {};
+  items.forEach(e => { (groups[e.date] = groups[e.date] || []).push(e); });
+  let html = "";
+  Object.keys(groups).sort().reverse().forEach(d => {
+    // pas de total de jour : dettes et remboursements ne doivent jamais être mélangés en une seule somme
+    html += `<div class="list-header"><span class="t" style="font-size:15px;color:var(--secondary-label);text-transform:capitalize">${esc(dayName(d))}</span></div><div class="group">`;
+    groups[d].forEach(e => {
+      html += `<div class="rowitem" role="button" tabindex="0" onclick="openDebtSheet('${e.debtId}')"
+        aria-label="${esc(tt("Dette : {a}, {b}", { a: e.name, b: money(e.amount) }))}">
+        <div class="icon-badge" style="background:${e.t === "pay" ? "rgba(52,199,89,.16)" : "rgba(var(--accent-rgb),.14)"}">${e.t === "pay" ? "🔁" : e.dir === "dois" ? "💸" : "🤝"}</div>
+        <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(e.t === "pay" ? t("Remboursement") : (e.dir === "dois" ? t("Je dois") : t("On me doit")) + (e.due ? " · " + tt("Échéance {a}", { a: dayName(e.due) }) : ""))}</div></div>
+        <div class="amt" style="color:${e.t === "pay" ? "var(--green)" : (e.dir === "dois" ? "var(--red)" : "var(--label)")}"
+        >${e.t === "pay" ? "+" : e.dir === "dois" ? "−" : "+"}${money(e.amount)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  host.innerHTML = html;
+}
 function applyHistoryFilter(){
+  if (state.kind === "dettes") return applyDebtHistoryFilter();
   const f = document.getElementById("hist-filter").dataset.c || "all";
   const q = (document.getElementById("hist-search").value||"").toLowerCase().trim();
   const all = [...state.expenses].sort(byRecent);

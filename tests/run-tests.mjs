@@ -28,7 +28,7 @@ const todayISO = () => ymd(new Date());
 const amountFns = new Function(grab("function esc(", "function catOf") + "return { esc, parseAmount };")();
 const csvFns = new Function("DAY", grab("const CAT_HINTS", "let csvRows = null") + "return { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat };")(864e5);
 const CATS = { other:{label:"Autre",emoji:"📦",color:"#8e8e93"}, food:{label:"Alimentation",emoji:"🍔",color:"#ff9500"}, transport:{label:"Transport",emoji:"🚕",color:"#5ac8fa"} };
-const backupFns = new Function("SCHEMA_VERSION", "CATS", "todayISO", grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") + "return { buildBackup, normalizeDebts, debtRemain, debtTotals };")(3, CATS, todayISO);
+const backupFns = new Function("SCHEMA_VERSION", "CATS", "todayISO", grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") + "return { buildBackup, normalizeDebts, debtRemain, debtTotals, debtLedgerEntries };")(3, CATS, todayISO);
 const ocr = new Function("state", grab("function parseAmount", "function catOf") +
   grab("const stripAccents", "function fillOcrCats") + "return { ocrExtract, ocrGuessCat, stripAccents };")(
   { cats: { food:{label:"Alimentation"}, transport:{label:"Transport"}, bills:{label:"Logement"}, fun:{label:"Loisirs"}, health:{label:"Santé et pharmacie"}, other:{label:"Autre"} } });
@@ -36,7 +36,7 @@ const recFns = new Function("ymd", "todayISO", "state", "save", grab("/* =======
 
 const { esc, parseAmount } = amountFns;
 const { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat } = csvFns;
-const { buildBackup, normalizeDebts, debtRemain, debtTotals } = backupFns;
+const { buildBackup, normalizeDebts, debtRemain, debtTotals, debtLedgerEntries } = backupFns;
 const { ocrExtract, ocrGuessCat } = ocr;
 const { nextOccur, firstOccur, processRecurring } = recFns;
 
@@ -359,6 +359,17 @@ check(bakBooksTheme.books.find(b=>b.id==="b1").theme === "blue"
 
 /* ======== Dettes : normalisation + totaux (livre type dettes) ======== */
 const T = "2026-10-22";
+const ndPay = normalizeDebts([
+  { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed", dir:"dois", amount:500, date:"2026-10-01",
+    payments:[ { id:"bbbbbbbb-2222-4222-8222-000000000001", date:"2026-10-05", amount:120 },
+               { date:"2026-99-99", amount:50 },          // date pourrie → aujourd'hui
+               { amount:0 }, null, "x" ] }                // invalides → rejetés
+], T);
+eq(ndPay[0].payments.length, 2, "normalizeDebts : remboursements invalides rejetés");
+eq(ndPay[0].payments[0].amount, 120, "normalizeDebts : remboursement légitime conservé");
+eq(ndPay[0].payments[1].date, T, "normalizeDebts : remboursement sans date → aujourd'hui");
+check(UUIDRE.test(ndPay[0].payments[1].id), "normalizeDebts : id de remboursement reconstruit");
+
 const ndList = normalizeDebts([
   { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed — moto", dir:"dois", amount:50000, date:"2026-10-01", paid:12000, due:"2026-11-30" },
   { id:"<img src=x onerror>", name:"Kofi", dir:"me", amount:8000, date:"2026-10-05" },
@@ -422,6 +433,35 @@ check(bakDettes.books.find(b => b.id === "b1").data.kind === "dep"
       "buildBackup : livre sans type → kind dep, dettes vides");
 check(bakDettes.expenses.length === 0 && bakDettes.books.find(b => b.id === "b1").data.expenses.length === 1,
       "buildBackup : les dépenses des autres livres restent dans leur livre");
+
+/* ======== Historique dettes : chronologie unifiée + paiements ======== */
+const ul = debtLedgerEntries([
+  { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed — moto", dir:"dois", amount:50000, date:"2026-10-01",
+    payments:[ { id:"bbbbbbbb-2222-4222-8222-000000000001", date:"2026-10-05", amount:12000 },
+               { id:"cccccccc-3333-4333-8333-000000000001", date:"2026-10-20", amount:9000 } ] },
+  { id:"dddddddd-4444-4444-8444-000000000001", name:"Ama — taxi", dir:"me", amount:5000, date:"2026-10-05" }
+]);
+eq(ul.length, 4, "debtLedgerEntries : dettes + remboursements unifiés");
+eq(ul[0].t + "|" + ul[0].date, "pay|2026-10-20", "debtLedgerEntries : plus récent d'abord");
+eq(ul[1].t + "|" + ul[1].dir, "debt|me", "debtLedgerEntries : créance du même jour");
+ul.filter(e => e.date === "2026-10-05").forEach(() => {});
+check(ul[1].name === "Ama — taxi" && ul[2].t === "pay" && ul[2].name === "Ahmed — moto",
+      "debtLedgerEntries : remboursement avant sa dette quand date < dette");
+check(ul[3].date === "2026-10-01" && ul[3].t === "debt", "debtLedgerEntries : dernière = dette la plus ancienne");
+const bakPays = buildBackup({
+  v:3, bookId:"b2",
+  books: [
+    { id:"b2", name:"Dettes", data:{ expenses:[], kind:"dettes", debts:[
+        { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed", dir:"dois", amount:500, date:"2026-10-01", paid:120,
+          payments:[ { id:"bbbbbbbb-2222-4222-8222-000000000001", date:"2026-10-05", amount:120 },
+                     { date:"x-y-z", amount:-5 } ] } ] } }
+  ],
+  cats: { food:{ label:"Food", emoji:"🍔", color:"#ff9500" } }
+});
+const bp2 = bakPays.books.find(b => b.id === "b2").data.debts[0];
+eq(bp2.payments.length, 1, "buildBackup : remboursement invalide rejeté");
+eq(bp2.payments[0].amount, 120, "buildBackup : journal de remboursements conservé");
+eq(bp2.paid, 120, "buildBackup : paid cohérent avec le journal");
 
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

@@ -687,6 +687,7 @@ function updateChipSel(){
 
 /* ============ Comparatif vs mois précédent ============ */
 function renderCompare(){
+  if (state.kind === "dettes"){ document.getElementById("compare-card").style.display = "none"; return; }
   const host = document.getElementById("compare-host");
   const period = document.getElementById("stat-seg").dataset.p || "month";
   document.getElementById("compare-card").style.display = period==="year" ? "none" : "block";

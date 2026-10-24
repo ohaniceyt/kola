@@ -533,7 +533,7 @@ function renderEveningView(){
       const col = r.days < 0 ? "var(--red)" : "";
       lines += `<div class="setrow" style="cursor:pointer" onclick="closeEveningSheet(); openDebtSheetGlobal('${r.debtId || ""}')" role="button" tabindex="0" aria-label="${esc(r.name)}">
         <div class="n" style="font-size:14px">${r.dir === "dois" ? "💸" : "🤝"} ${esc(r.name)}
-          <div style="font-size:12px;color:${col || "var(--secondary-label)"}">${esc(dl)} · ${tt("Reste {a}", { a: money(r.remain) })}</div>
+          <div style="font-size:12px;color:${col || "var(--secondary-label)"}">${esc(dl)} · ${tt("{a} restants", { a: money(r.remain) })}</div>
         </div>
         <div class="v chev">›</div>
       </div>`;
@@ -692,6 +692,7 @@ function shareOrDownloadFallback(data, name){
   return "downloaded";
 }
 function exportCSV(){
+  if (state.kind === "dettes") return exportDebtsCSV();
   const rows = [["Date","Libellé","Catégorie","Montant"]];
   [...state.expenses].sort((a,b)=>b.date.localeCompare(a.date)).forEach(e=>{
     rows.push([e.date, e.name, catOf(e.cat).label, e.amount.toFixed(2)]);
@@ -700,6 +701,26 @@ function exportCSV(){
   shareOrDownload(csv, "text/csv", "kola-" + todayISO() + ".csv", "📤 CSV exporté").then(how=>{
     if (how === "downloaded") toast("📤 CSV exporté");
   });
+}
+/* Livre dettes : CSV dédié (démontrable au partage, ré-importable nulle part — gardé par detectDebtsCsv) */
+function exportDebtsCSV(){
+  const rows = [["Date","Type","Personne","Montant","Remboursements","Restant","Échéance"]];
+  [...state.debts].sort((a,b)=>b.date.localeCompare(a.date)).forEach(d=>{
+    rows.push([d.date, d.dir === "me" ? t("On me doit") : t("Je dois"), d.name, (+d.amount).toFixed(2),
+               (+d.paid||0).toFixed(2), debtRemain(d).toFixed(2), d.due || ""]);
+    [...(d.payments||[])].sort((a,b)=>String(b.date).localeCompare(String(a.date))).forEach(p=>{
+      rows.push([p.date, t("Remboursement"), d.name, (+p.amount).toFixed(2), "", "", ""]);
+    });
+  });
+  const csv = "﻿" + rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\r\n");
+  shareOrDownload(csv, "text/csv", "kola-dettes-" + todayISO() + ".csv", "📤 CSV des dettes exporté").then(how=>{
+    if (how === "downloaded") toast("📤 " + t("CSV des dettes exporté"));
+  });
+}
+/* Les exports dettes ne doivent jamais se ré-importer comme relevés bancaires */
+function isDebtsCsv(txt){
+  const first = String(txt || "").replace(/^[﻿\s]*/, "").split(/\r?\n/, 1)[0];
+  return /"?Date"?;?\s*"?Type"?;?\s*"?Personne"?;?/i.test(first);
 }
 const HIST_PAGE = 200;
 let histShown = HIST_PAGE;

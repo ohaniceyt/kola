@@ -143,8 +143,15 @@ function renderDebtPays(d){
   const field = document.getElementById("db-pays-field");
   const host = document.getElementById("db-pays"); if (!field || !host) return;
   const pays = (d && Array.isArray(d.payments)) ? [...d.payments].sort((a, b) => String(b.date).localeCompare(String(a.date))) : [];
-  field.style.display = pays.length ? "" : "none";
-  host.innerHTML = pays.map(p =>
+  const journaled = pays.reduce((s, p) => s + (+p.amount || 0), 0);
+  const legacy = d && (d.paid || 0) - journaled > 0.005;   // dettes d'avant le journal (v0.9) : paid > journal
+  field.style.display = (pays.length || legacy) ? "" : "none";
+  host.innerHTML = (legacy
+    ? `<div class="setrow">
+        <div class="icon-badge" style="background:rgba(52,199,89,.16)">🔁</div>
+        <div class="n">${esc(t("Paiements antérieurs (non datés)"))}</div>
+        <div class="v" style="color:var(--green)">${money((d.paid || 0) - journaled)}</div>
+      </div>` : "") + pays.map(p =>
     `<div class="setrow">
       <div class="icon-badge" style="background:rgba(52,199,89,.16)">🔁</div>
       <div class="n">${esc(tt("Remboursement · {a}", { a: dayName(p.date) }))}</div>
@@ -385,6 +392,10 @@ function importDataFile(file){
   fr.onload = () => {
     const txt = String(fr.result || "").trim();
     if (/^[[{]/.test(txt)) return importBackupText(txt);   // JSON : sauvegarde ou fichier couple
+    if (isDebtsCsv(txt)){                                   // export dettes : jamais un relevé bancaire
+      toast(t("C'est un export dettes Kola — il ne s'importe pas en relevé bancaire."));
+      return;
+    }
     openCsvSheet(parseCsv(txt));                            // sinon : relevé bancaire CSV
   };
   fr.readAsText(file);

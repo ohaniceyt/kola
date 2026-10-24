@@ -488,5 +488,16 @@ eq(dues[0].days, -7, "dueReminders : jours négatifs = en retard");
 eq(dues[2].remain, 40, "dueReminders : reste exact");
 eq(dueReminders([], "2026-10-22").length, 0, "dueReminders : vide → aucune");
 
+/* ======== Garde : export dettes ⇒ jamais ré-importé comme relevé bancaire ======== */
+const csvGuardFns = new Function(grab("function isDebtsCsv", "const HIST_PAGE") + "return { isDebtsCsv };")();
+const { isDebtsCsv } = csvGuardFns;
+check(isDebtsCsv('Date;Type;Personne;Montant;Remboursements;Restant;Échéance\r\n"2026-10-01";"Je dois";"Ahmed";"500,00";"120,00";"380,00";""'),
+      "isDebtsCsv : en-tête export dettes reconnu");
+check(isDebtsCsv('﻿"Date";"Type";"Personne";"Montant";"Remboursements";"Restant";"Échéance"'),
+      "isDebtsCsv : BOM + en-tête guillemé reconnu");
+check(!isDebtsCsv('Date;Libellé;Montant\n10/09/2026;Netflix;-13,49'),
+      "isDebtsCsv : relevé bancaire normal non capté");
+check(!isDebtsCsv(''), "isDebtsCsv : vide → non");
+
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

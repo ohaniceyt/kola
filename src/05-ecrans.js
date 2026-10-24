@@ -7,6 +7,16 @@ function weekBounds(offset){
   return [ymd(monday), ymd(sunday)];
 }
 function renderStats(period){
+  if (state.kind === "dettes") return renderStatsDettes();
+  // Restaure l'habillage dépenses (peut avoir été masqué en livre dettes)
+  const segEl = document.getElementById("stat-seg"); if (segEl) segEl.style.display = "";
+  const st = document.getElementById("stats-sub"); if (st) st.textContent = t("Analyse de tes dépenses");
+  ["donut2-card","bars-card","compare-card"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = "";
+  });
+  renderStatsLedger(period);
+}
+function renderStatsLedger(period){
   const now = new Date();
   let items;
   if (period==="month"){ items = state.expenses.filter(e=>e.date.startsWith(todayISO().slice(0,7))); }
@@ -54,6 +64,22 @@ function renderStats(period){
     `<div class="col"><div class="stick ${i===mm.length-1?"":"other"}" style="height:${Math.max(m.v/mMax*100,3)}%"></div><div class="ml">${m.label}</div></div>`).join("");
 }
 
+/* Livre dettes : statistiques orientées dettes/créances (jamais dépenses, jamais de net) */
+function renderStatsDettes(){
+  const segEl = document.getElementById("stat-seg"); if (segEl) segEl.style.display = "none";
+  const st = document.getElementById("stats-sub"); if (st) st.textContent = t("Analyse de tes dettes et créances");
+  ["donut2-card","bars-card","compare-card"].forEach(id => document.getElementById(id).style.display = "none");
+  const tl = debtTotals(state.debts);
+  const nb = state.debts.length;
+  const settled = state.debts.filter(d => debtRemain(d) <= 0).length;
+  document.getElementById("stat-grid").innerHTML = `
+    <div class="stat"><div class="sv">${money(tl.dois)}</div><div class="sl">${t("💸 Je dois")}</div></div>
+    <div class="stat"><div class="sv">${money(tl.me)}</div><div class="sl">${t("🤝 On me doit")}</div></div>
+    <div class="stat"><div class="sv">${money(tl.paidDois + tl.paidMe)}</div><div class="sl">${t("Remboursé / encaissé")}</div></div>
+    <div class="stat"><div class="sv">${tl.pct} %</div><div class="sl">${t("Remboursement global")}</div></div>
+    <div class="stat"><div class="sv">${nb}</div><div class="sl">${t("Notées au total")}</div></div>
+    <div class="stat"><div class="sv">${settled}/${nb}</div><div class="sl">${t("Soldées")}</div></div>`;
+}
 function renderHistory(){ applyHistoryFilter(); }
 
 /* ============ Sheet ============ */

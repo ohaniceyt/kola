@@ -1,19 +1,29 @@
 /*
  * Batterie de tests de Kola — `node tests/run-tests.mjs`
  *
- * Les fonctions testées sont pures et vivent dans index.html : on les extrait
- * par sections (repères stables) et on les évalue avec des stubs injectés.
- * Zéro dépendance. Couvre : parseur de montants, CSV (banque Débit/Crédit,
- * relevés signés), validation stricte des sauvegardes (anti-injection),
- * extraction OCR (montant/date/marchand), récurrences (jamais rétroactives).
+ * Les fonctions testées sont pures et vivent dans src/*.js (chargées par
+ * index.html dans l'ordre, dans le même ordre qu'ils sont concaténés ici) :
+ * on les extrait par sections (repères stables) et on les évalue avec des
+ * stubs injectés. Zéro dépendance. Couvre : parseur de montants, CSV
+ * (banque Débit/Crédit, relevés signés), validation stricte des sauvegardes
+ * (anti-injection, y compris dettes), extraction OCR, récurrences.
  */
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const src = readFileSync(join(root, "index.html"), "utf8")
-  .split("<script>")[1].split("</script>")[0];
+const SRC_FILES = [
+  "01-donnees-livres",
+  "02-legal-stockage-recurrentes",
+  "03-import-csv-i18n",
+  "04-rendu",
+  "05-ecrans",
+  "06-dettes-restauration",
+  "07-couple-onboarding-divers",
+  "08-evenements-init-ocr-pwa",
+];
+const src = SRC_FILES.map(f => readFileSync(join(root, "src", f + ".js"), "utf8")).join("\n");
 
 const grab = (from, to) => {
   const a = src.indexOf(from), b = src.indexOf(to);

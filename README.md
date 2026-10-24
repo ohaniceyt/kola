@@ -1,4 +1,4 @@
-# Kola 💰 v0.9 — app PWA de suivi de dépenses
+# Kola 💰 v0.10 — app PWA de suivi de dépenses
 
 **Kola** (la noix de kola, symbole d'échange en Afrique de l'Ouest) — suivi de budget personnel, design iOS (Human Interface Guidelines), **100% local** : aucune donnée ne quitte l'appareil, jamais.
 
@@ -28,7 +28,7 @@
 
 - **Budget couple** : activation dans Réglages — chaque dépense porte « Qui a payé ? » (**Moi / Toi / À deux**), carte couple sur l'accueil avec répartition et solde (« X doit N à Y ») ; deux transports **100 % locaux** : **fichier d'échange** (delta idempotent — seules les dépenses jamais envoyées, identifiées par ids `sentIds` — dédupliqué, prénom du partenaire adopté) ou **synchro directe Wi-Fi** : WebRTC DataChannel apparié par QR (offre → réponse, scan caméra avec jsQR, repli coller-code) — les libs QR sont vendored dans `vendor/qr/`, aucun serveur, rien ne sort du réseau local ; à la réception, l'attribution est remappée moi⇄toi automatiquement (`deviceId`), et tout contenu reçu traverse la même validation stricte que les sauvegardes
 - ## Technique
-HTML/CSS/JS vanilla dans un seul `index.html` (~100 Ko), **zéro dépendance**, zéro serveur. Schéma de données versionné (v3) ; **budget couple** : delta par fichiers d'échange (liste `sentIds`) ou synchro **WebRTC** sans serveur (QR : `deflate-raw` + base64url, JSQR côté caméra), moteur de fusion pur testé (`coupleMergeInto`) ;, stockage « double copie » : `localStorage` (arbitré par un compteur `rev` monotone) + **IndexedDB** durable — supporte bien plus de 20 000 dépenses même quand le quota localStorage (~5 Mo chez Safari) sature, avec reprise auto de la copie la plus récente. Backup manuel encadré par un rappel automatique + bandeau mensuel, focus-trap et `role="button"` sur les listes (clavier).
+HTML/CSS/JS vanilla, **zéro dépendance build**, zéro serveur : `index.html` (shell) charge `assets/app.css` + `src/*.js` découpés par domaine dans un ordre figé, pré-cachés par le service worker. Schéma de données versionné (v3) ; **livres & dettes** : chaque livre porte ses données (`data.expenses`, `data.debts` avec journal de remboursements `payments[]`), tout ce qui re-rend à l'écran passe par la validation stricte (`buildLedger`, `normalizeDebts` — whitelist anti-injection). **Budget couple** : delta par fichiers d'échange (liste `sentIds`) ou synchro **WebRTC** sans serveur (QR : `deflate-raw` + base64url, JSQR côté caméra), moteur de fusion pur testé (`coupleMergeInto`) ; stockage « double copie » : `localStorage` (arbitré par un compteur `rev` monotone) + **IndexedDB** durable — supporte bien plus de 20 000 dépenses même quand le quota localStorage (~5 Mo chez Safari) sature, avec reprise auto de la copie la plus récente. Backup manuel encadré par un rappel automatique + bandeau mensuel, focus-trap et `role="button"` sur les listes (clavier).
 
 **OCR** : tesseract.js 7 + modèles `best_int` (fra, ~0,7 Mo) vendus dans `vendor/tesseract/` (~12 Mo, **hors cache d'install** du service worker — téléchargés à la 1ʳᵉ photo puis gardés en cache runtime/IndexedDB par le worker Tesseract). Extraction montant/date/marchand heuristique (lignes TOTAL, MONTANT, devise, centimes), batterie de tests versionnée (`node tests/run-tests.mjs`). Fonctionne hors ligne après la 1ʳᵉ utilisation.
 
@@ -39,13 +39,16 @@ Langues : FR (source) + EN — sélecteur « Langue » dans Réglages (Système 
 Design : [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/) — SF Pro, couleurs système iOS, dark mode auto, safe-areas, header « liquid glass », sheets au ressort (`cubic-bezier(.32,.72,.33,1)`).
 
 ## Fichiers
-- `index.html` — l'app complète (markup, styles, logique)
+- `index.html` — le shell (markup des pages, sheets et onglets) — charge le CSS + les scripts dans l'ordre
+- `assets/app.css` — tous les styles (sections commentées)
+- `src/*.js` — la logique, découpée par domaine dans l'ordre de chargement : `01-donnees-livres`, `02-legal-stockage-recurrentes`, `03-import-csv-i18n`, `04-rendu`, `05-ecrans`, `06-dettes-restauration`, `07-couple-onboarding-divers`, `08-evenements-init-ocr-pwa` — **scripts classiques** (pas de bundler ni de build), le service worker les pré-charge tous en un coup
 - `manifest.webmanifest` — manifeste PWA
-- `sw.js` — service worker (network-first sur les navigations, offline-first)
+- `sw.js` — service worker (network-first sur les navigations, offline-first ; ⚠️ assets/src sont cache-first : bump CACHE quand un fichier change)
 - `icons/` — icônes (SVG source vecteur + PNG 180/192/512) et `icons/splash/` — écrans de démarrage iOS
 - `scripts/gen-ios-assets.mjs` — générateur dev des PNG (script, pas déployé)
 - `vendor/qr/` — qrcode-generator + jsQR (vendored, lazy) : codes de connexion P2P
-- `tests/run-tests.mjs` — batterie de tests Node (~82 tests : parseurs montants/CSV, validation des sauvegardes, extraction OCR, récurrences) — extrait les fonctions pures de `index.html`, zéro dépendance : `node tests/run-tests.mjs`
+- `tests/run-tests.mjs` — batterie de tests Node (138 tests : parseurs montants/CSV, validation des sauvegardes dettes incluses, chronologie dettes, extraction OCR, récurrences) — concatène les fichiers `src/*.js` et extrait les fonctions pures par repères ; zéro dépendance
+- `tests/RECETTE.md` — recette manuelle à dérouler sur téléphone à chaque livraison
 
 ## Licence
 MIT.

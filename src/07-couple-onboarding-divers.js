@@ -518,7 +518,36 @@ function renderEveningView(){
       : `<div class="setrow"><div class="n" style="color:var(--red)">⚠️ ${tt("{a} de trop sur le mois", {a: money(-rest)})}</div></div>`;
   }
   if (state.expenses.length && !(state.lastBackupAt)) lines += `<div class="setrow"><div class="n" style="font-size:13.5px">${t("Aucune sauvegarde depuis la création — ton historique mérite un fichier")}</div></div>`;
+  // Rappels : échéances dettes/créances de TOUS les livres (≤ 7 jours ou dépassées)
+  const debtsAll = [...(state.debts || []),
+    ...getBooks().filter(b => b.id !== state.bookId).flatMap(b => (b.data.debts || []))];
+  const due = dueReminders(debtsAll, today);
+  if (due.length){
+    lines += `<div class="list-header" style="padding:10px 0 4px"><span class="t">⏰ ${t("Échéances à venir")}</span></div>`;
+    due.forEach(r => {
+      const dl = r.days < 0
+        ? tt("En retard de {n} jour{p}", { n: -r.days, p: r.days < -1 ? "s" : "" })
+        : r.days === 0 ? t("Échéance aujourd'hui")
+        : r.days === 1 ? t("Échéance demain")
+        : tt("Dans {n} jour{p}", { n: r.days, p: r.days > 1 ? "s" : "" });
+      const col = r.days < 0 ? "var(--red)" : "";
+      lines += `<div class="setrow" style="cursor:pointer" onclick="closeEveningSheet(); openDebtSheetGlobal('${r.debtId || ""}')" role="button" tabindex="0" aria-label="${esc(r.name)}">
+        <div class="n" style="font-size:14px">${r.dir === "dois" ? "💸" : "🤝"} ${esc(r.name)}
+          <div style="font-size:12px;color:${col || "var(--secondary-label)"}">${esc(dl)} · ${tt("Reste {a}", { a: money(r.remain) })}</div>
+        </div>
+        <div class="v chev">›</div>
+      </div>`;
+    });
+  }
   host.innerHTML = lines;
+}
+/* Tap sur un rappel d'échéance : ouvre la fiche de la dette, où qu'elle vive */
+function openDebtSheetGlobal(debtId){
+  if (state.debts.some(d => d && d.id === debtId)){ openDebtSheet(debtId); return; }
+  const holder = getBooks().find(b => (b.data.debts || []).some(d => d && d.id === debtId));
+  if (!holder) return;
+  bookSwitch(holder.id);
+  openDebtSheet(debtId);
 }
 function openDeviceSheet(){
   document.getElementById("overlay").classList.add("show"); syncScrollLock();

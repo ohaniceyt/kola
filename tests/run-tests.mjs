@@ -38,7 +38,7 @@ const todayISO = () => ymd(new Date());
 const amountFns = new Function(grab("function esc(", "function catOf") + "return { esc, parseAmount };")();
 const csvFns = new Function("DAY", grab("const CAT_HINTS", "let csvRows = null") + "return { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat };")(864e5);
 const CATS = { other:{label:"Autre",emoji:"📦",color:"#8e8e93"}, food:{label:"Alimentation",emoji:"🍔",color:"#ff9500"}, transport:{label:"Transport",emoji:"🚕",color:"#5ac8fa"} };
-const backupFns = new Function("SCHEMA_VERSION", "CATS", "todayISO", grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") + "return { buildBackup, normalizeDebts, debtRemain, debtTotals, debtLedgerEntries };")(3, CATS, todayISO);
+const backupFns = new Function("SCHEMA_VERSION", "CATS", "todayISO", grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") + "return { buildBackup, normalizeDebts, debtRemain, debtTotals, debtLedgerEntries, dueReminders };")(3, CATS, todayISO);
 const ocr = new Function("state", grab("function parseAmount", "function catOf") +
   grab("const stripAccents", "function fillOcrCats") + "return { ocrExtract, ocrGuessCat, stripAccents };")(
   { cats: { food:{label:"Alimentation"}, transport:{label:"Transport"}, bills:{label:"Logement"}, fun:{label:"Loisirs"}, health:{label:"Santé et pharmacie"}, other:{label:"Autre"} } });
@@ -46,7 +46,7 @@ const recFns = new Function("ymd", "todayISO", "state", "save", grab("/* =======
 
 const { esc, parseAmount } = amountFns;
 const { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat } = csvFns;
-const { buildBackup, normalizeDebts, debtRemain, debtTotals, debtLedgerEntries } = backupFns;
+const { buildBackup, normalizeDebts, debtRemain, debtTotals, debtLedgerEntries, dueReminders } = backupFns;
 const { ocrExtract, ocrGuessCat } = ocr;
 const { nextOccur, firstOccur, processRecurring } = recFns;
 
@@ -472,6 +472,21 @@ const bp2 = bakPays.books.find(b => b.id === "b2").data.debts[0];
 eq(bp2.payments.length, 1, "buildBackup : remboursement invalide rejeté");
 eq(bp2.payments[0].amount, 120, "buildBackup : journal de remboursements conservé");
 eq(bp2.paid, 120, "buildBackup : paid cohérent avec le journal");
+
+/* ======== Rappels d'échéances (vue du soir) ======== */
+const dues = dueReminders([
+  { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"En retard", dir:"dois", amount:100, date:"2026-01-01", paid:0, due:"2026-10-15" },
+  { id:"bbbbbbbb-2222-4222-8222-000000000001", name:"Demain", dir:"me", amount:50, date:"2026-10-01", paid:10, due:"2026-10-23" },
+  { id:"cccccccc-3333-4333-8333-000000000001", name:"Aujourd'hui", dir:"dois", amount:80, date:"2026-10-01", paid:0, due:"2026-10-22" },
+  { id:"dddddddd-4444-4444-8444-000000000001", name:"Loin", dir:"dois", amount:200, date:"2026-10-01", due:"2027-01-01" },      // hors horizon
+  { id:"eeeeeeee-5555-4555-8555-000000000001", name:"Soldée", dir:"me", amount:60, date:"2026-10-01", paid:60, due:"2026-10-24" }, // ignorée
+  { id:"ffffffff-6666-4666-8666-000000000001", name:"Sans échéance", dir:"dois", amount:70, date:"2026-10-01" }
+], "2026-10-22");
+eq(dues.length, 3, "dueReminders : hors horizon / soldées / sans échéance exclus");
+eq(dues.map(d => d.name), ["En retard", "Aujourd'hui", "Demain"], "dueReminders : plus urgent d'abord");
+eq(dues[0].days, -7, "dueReminders : jours négatifs = en retard");
+eq(dues[2].remain, 40, "dueReminders : reste exact");
+eq(dueReminders([], "2026-10-22").length, 0, "dueReminders : vide → aucune");
 
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

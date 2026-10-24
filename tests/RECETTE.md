@@ -27,6 +27,11 @@
 - [ ] Recherche par nom : filtre correctement
 - [ ] Tap sur une entrée → fiche correspondante
 
+## 5bis. Rappels d'échéances (le soir, après 18h)
+- [ ] À l'ouverture du soir, une dette dont l'échéance est ≤ 7 jours (ou dépassée) apparaît dans « ⏰ Échéances à venir »
+- [ ] Tap sur le rappel → la fiche de la dette s'ouvre (basculant de livre si besoin)
+- [ ] Une dette soldée ou sans échéance n'apparaît pas
+
 ## 6. Dépenses classiques (livre 📕)
 - [ ] ＋ → saisie rapide / pavé numérique / catégorie : la dépense s'ajoute
 - [ ] Tap sur la dépense → Modification ; « Même dépense aujourd'hui » ; suppression

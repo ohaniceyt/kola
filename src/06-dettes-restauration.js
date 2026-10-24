@@ -41,6 +41,18 @@ function debtTotals(debts){
   if (orig > 0) t.pct = Math.round(((t.paidDois + t.paidMe) / orig) * 100);
   return t;
 }
+/* Rappels d'échéances : dettes/créances non soldées qui arrivent (horizon 7 j) ou sont dépassées.
+   days < 0 = en retard. Pure, testée. */
+function dueReminders(debts, today, horizon = 7){
+  const out = [];
+  (debts || []).filter(d => d && typeof d === "object" && d.due && debtRemain(d) > 0).forEach(d => {
+    const a = new Date(d.due + "T00:00:00"), b = new Date(today + "T00:00:00");
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return;
+    const days = Math.round((a - b) / 864e5);
+    if (days <= horizon) out.push({ debtId: d.id, name: String(d.name || "…"), dir: d.dir === "me" ? "me" : "dois", remain: debtRemain(d), days, due: d.due });
+  });
+  return out.sort((x, y) => x.days - y.days);
+}
 /* Chronologie unifiée (dettes + créances + remboursements) — pure, testée.
    Tri : date desc, puis les dettes/créances avant les remboursements du même jour. */
 function debtLedgerEntries(debts){

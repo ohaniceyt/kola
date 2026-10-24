@@ -1,4 +1,4 @@
-# Kola 💰 v0.10 — app PWA de suivi de dépenses
+# Kola 💰 v0.11 — app PWA de suivi de dépenses
 
 **Kola** (la noix de kola, symbole d'échange en Afrique de l'Ouest) — suivi de budget personnel, design iOS (Human Interface Guidelines), **100% local** : aucune donnée ne quitte l'appareil, jamais.
 
@@ -23,7 +23,7 @@
 - **Budget couple** : active dans Réglages — chaque dépense porte une attribution **Moi / Toi / À deux** (badge dans les listes), et l'accueil affiche la répartition du mois + le **solde** (ce que l'un doit à l'autre). Deux façons de synchroniser, 100% local :
   - **Fichier d'échange** (Recommandé pour la mise à jour longue distance) : Réglages → Budget couple → 📤 Fichier d'échange (delta seulement, la suite des dépenses jamais envoyées) → le partenaire l'importe (📥) et les attributions moi⇄toi sont remappées automatiquement
   - **P2P en direct** (même Wi-Fi) : « Synchroniser maintenant (Wi-Fi) » → un téléphone montre son **code QR** (SDP compressé), l'autre le **scanne** (caméra) — WebRTC sans aucun serveur, les données circulent directly de téléphone à téléphone ; le SDP ne contient que des adresses de réseau local
-- **Vue du soir** : à l'ouverture entre 18h et 5h, résumé du jour (dépenses, plus grosse dépense, solde mensuel) + rappels — une fois par soir, alternative 100% locale aux notifications push (impossibles sans serveur sur iOS)
+- **Vue du soir** : à l'ouverture entre 18h et 5h, résumé du jour (dépenses, plus grosse dépense, solde mensuel) + rappels — dont la section **⏰ Échéances à venir** : dettes/créances de tous les livres non soldées arrivant à échéance (≤ 7 jours) ou en retard, tap → fiche de la dette correspondante ; une fois par soir, alternative 100% locale aux notifications push (impossibles sans serveur sur iOS)
 - **Hors ligne** : service worker, tout marche sans réseau
 
 - **Budget couple** : activation dans Réglages — chaque dépense porte « Qui a payé ? » (**Moi / Toi / À deux**), carte couple sur l'accueil avec répartition et solde (« X doit N à Y ») ; deux transports **100 % locaux** : **fichier d'échange** (delta idempotent — seules les dépenses jamais envoyées, identifiées par ids `sentIds` — dédupliqué, prénom du partenaire adopté) ou **synchro directe Wi-Fi** : WebRTC DataChannel apparié par QR (offre → réponse, scan caméra avec jsQR, repli coller-code) — les libs QR sont vendored dans `vendor/qr/`, aucun serveur, rien ne sort du réseau local ; à la réception, l'attribution est remappée moi⇄toi automatiquement (`deviceId`), et tout contenu reçu traverse la même validation stricte que les sauvegardes

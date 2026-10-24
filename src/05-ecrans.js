@@ -73,10 +73,14 @@ function renderStatsDettes(){
   const nb = state.debts.length;
   const settled = state.debts.filter(d => debtRemain(d) <= 0).length;
   document.getElementById("stat-grid").innerHTML = `
-    <div class="stat"><div class="sv" style="font-size:18px">${money(tl.dois)} / ${money(tl.me)}</div><div class="sl">${t("Je dois / On me doit")}</div></div>
-    <div class="stat"><div class="sv" style="font-size:18px">${money(tl.paidDois)} / ${money(tl.paidMe)}</div><div class="sl">${t("Remboursé / Encaissé")}</div></div>
-    <div class="stat"><div class="sv">${tl.pctDois} % / ${tl.pctMe} %</div><div class="sl">${t("Remboursement / Encaissement")}</div></div>
-    <div class="stat"><div class="sv">${nb} / ${settled}</div><div class="sl">${t("Notées / Soldées")}</div></div>`;
+    <div class="stat"><div class="sv">${money(tl.dois)}</div><div class="sl">${t("Je dois")}</div></div>
+    <div class="stat"><div class="sv">${money(tl.me)}</div><div class="sl">${t("On me doit")}</div></div>
+    <div class="stat"><div class="sv">${money(tl.paidDois)}</div><div class="sl">${t("Remboursé")}</div></div>
+    <div class="stat"><div class="sv">${money(tl.paidMe)}</div><div class="sl">${t("Encaissé")}</div></div>
+    <div class="stat"><div class="sv">${tl.pctDois} %</div><div class="sl">${t("Remboursement")}</div></div>
+    <div class="stat"><div class="sv">${tl.pctMe} %</div><div class="sl">${t("Encaissement")}</div></div>
+    <div class="stat"><div class="sv">${nb}</div><div class="sl">${t("Notées")}</div></div>
+    <div class="stat"><div class="sv">${settled}</div><div class="sl">${t("Soldées")}</div></div>`;
 }
 function renderHistory(){ applyHistoryFilter(); }
 

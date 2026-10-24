@@ -1,4 +1,4 @@
-# Kola 💰 v0.15 — app PWA de suivi de dépenses
+# Kola 💰 v0.16 — app PWA de suivi de dépenses
 
 **Kola** (la noix de kola, symbole d'échange en Afrique de l'Ouest) — suivi de budget personnel, design iOS (Human Interface Guidelines), **100% local** : aucune donnée ne quitte l'appareil, jamais.
 

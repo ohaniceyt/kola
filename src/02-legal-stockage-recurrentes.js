@@ -19,7 +19,7 @@ const LEGAL = {
     ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
           "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
     ["h", "Version", "Version"],
-    ["p", "Kola v0.12 — dernière mise à jour : octobre 2026.", "Kola v0.12 — last updated: October 2026."],
+    ["p", "Kola v0.13 — dernière mise à jour : octobre 2026.", "Kola v0.13 — last updated: October 2026."],
   ],
   confidentialite: [
     ["h", "L'essentiel", "The essentials"],

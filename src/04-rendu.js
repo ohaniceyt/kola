@@ -122,8 +122,9 @@ function renderHome(){
       document.getElementById("mini-me-bar").firstElementChild.style.width = (tlD.me ? tlD.pctMe : 100) + "%";
     } else mini.style.display = "none";
   }
-  const rh = document.getElementById("recent-header"), dc = document.getElementById("dettes-card");
+  const rh = document.getElementById("recent-header"), rl = document.getElementById("recent-list"), dc = document.getElementById("dettes-card");
   if (rh) rh.style.display = dettes ? "none" : "";
+  if (rl) rl.style.display = dettes ? "none" : "";   // les « Récentes » du livre précédent ne doivent pas fuir en livre dettes
   if (dc) dc.style.display = "";   // visible dans les deux types : héros dettes et/ou carte (le rendu diffère)
   if (dettes){ backupReminder(); renderDettesHome(); return; }
   const month = todayISO().slice(0,7);

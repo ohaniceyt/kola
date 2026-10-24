@@ -323,7 +323,9 @@ function buildBackup(s){
       if (!id || seen.has(id)) id = "b" + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
       seen.add(id);
       const themeOut = themeOk(b.theme);
-      return { id, name: bkName(b.name), emoji: safeEmoji(b.emoji || "📖"), ...(themeOut ? { theme: themeOut } : {}), data: buildLedger(d) };
+      const led = buildLedger(d);
+      if (d.kind === undefined && b.kind === "dettes") led.kind = "dettes";   // tolère kind au niveau du livre (fichiers tiers)
+      return { id, name: bkName(b.name), emoji: safeEmoji(b.emoji || "📖"), ...(themeOut ? { theme: themeOut } : {}), data: led };
     });
     const act = booksOut.find(b => b.id === s.bookId) || booksOut[0];
     return {

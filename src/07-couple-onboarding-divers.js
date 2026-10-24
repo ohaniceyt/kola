@@ -786,7 +786,7 @@ function applyHistoryFilter(){
   let emptyMsg;
   if (!items.length){
     const c = catOf(f);
-    if (q) emptyMsg = emptyState("🔍", tt("Aucun résultat pour «\u00a0{a}\u00a0»", {a: esc(q)}), t("Vérifie l'orthographe ou essaie un autre mot."));
+    if (q) emptyMsg = emptyState("🔍", tt("Aucun résultat pour « {a} »", {a: esc(q)}), t("Vérifie l'orthographe ou essaie un autre mot."));
     else if (f !== "all") emptyMsg = emptyState(c.emoji, tt("Rien en {a} pour le moment", {a: esc(c.label)}), t("Ajoute une dépense dans cette catégorie — ou vois tout."));
   }
   renderList("history-list", shown, false, emptyMsg);

@@ -444,6 +444,16 @@ check(bakDettes.books.find(b => b.id === "b1").data.kind === "dep"
 check(bakDettes.expenses.length === 0 && bakDettes.books.find(b => b.id === "b1").data.expenses.length === 1,
       "buildBackup : les dépenses des autres livres restent dans leur livre");
 
+/* kind au niveau du livre (fichiers tiers) : toléré et revalidé */
+const bakKindBook = buildBackup({
+  v:3, bookId:"z",
+  books: [ { id:"z", name:"Ext", kind:"dettes", data:{ expenses:[], debts:[ { name:"X", dir:"dois", amount:5, date:"2026-10-01" } ] } } ],
+  cats: { food:{ label:"Food", emoji:"🍔", color:"#ff9500" } }
+});
+check(bakKindBook.books[0].data.kind === "dettes" && bakKindBooksSafe(),
+      "buildBackup : kind au niveau du livre détecté (fichiers tiers)");
+function bakKindBooksSafe(){ return bakKindBook.kind === "dettes"; }
+
 /* ======== Historique dettes : chronologie unifiée + paiements ======== */
 const ul = debtLedgerEntries([
   { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Ahmed — moto", dir:"dois", amount:50000, date:"2026-10-01",

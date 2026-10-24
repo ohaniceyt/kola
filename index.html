@@ -253,6 +253,8 @@
     transition: box-shadow .2s;
   }
   .field input:focus { box-shadow: 0 0 0 3px rgba(var(--accent-rgb),.4); }
+  /* Cases de date (iOS : largeur intrinsèque qui déborde sinon) */
+  .field input[type="date"] { min-width:0; max-width:100%; -webkit-appearance:none; appearance:none; }
   .amount-input { display:flex; align-items:baseline; }
   .amount-input .cur { font-size: 28px; font-weight: 700; margin-right: 6px; color: var(--tertiary-label); }
   .amount-input input { font-size: 32px !important; font-weight: 800; padding: 12px 14px !important; font-variant-numeric:tabular-nums; }

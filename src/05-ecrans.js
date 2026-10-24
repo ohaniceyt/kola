@@ -74,10 +74,11 @@ function renderStatsDettes(){
   const settled = state.debts.filter(d => debtRemain(d) <= 0).length;
   document.getElementById("stat-grid").innerHTML = `
     <div class="stat"><div class="sv">${money(tl.dois)}</div><div class="sl">${t("💸 Je dois")}</div></div>
+    <div class="stat"><div class="sv">${tl.pctDois} %</div><div class="sl">${t("Remboursement")}</div></div>
     <div class="stat"><div class="sv">${money(tl.me)}</div><div class="sl">${t("🤝 On me doit")}</div></div>
+    <div class="stat"><div class="sv">${tl.pctMe} %</div><div class="sl">${t("Encaissement")}</div></div>
     <div class="stat"><div class="sv">${money(tl.paidDois)}</div><div class="sl">${t("Remboursé")}</div></div>
     <div class="stat"><div class="sv">${money(tl.paidMe)}</div><div class="sl">${t("Encaissé")}</div></div>
-    <div class="stat"><div class="sv">${tl.pct} %</div><div class="sl">${t("Remboursement global")}</div></div>
     <div class="stat"><div class="sv">${nb}</div><div class="sl">${t("Notées au total")}</div></div>
     <div class="stat"><div class="sv">${settled}/${nb}</div><div class="sl">${t("Soldées")}</div></div>`;
 }

@@ -723,6 +723,101 @@ function isDebtsCsv(txt){
   return /"?Date"?;?\s*"?Type"?;?\s*"?Personne"?;?/i.test(first);
 }
 const HIST_PAGE = 200;
+
+/* ============ Historique : filtre période + personne ============ */
+const HIST_MODES = ["all","week","month","year","custom"];
+let histBook = "";          // livre pour lequel les filtres sont mémorisés (réinitialisés si on change)
+let histMode = "all";       // all | week | month | year | custom
+let histOff = 0;            // décalage : 0 = période courante, -1 = précédente, +1 = suivante
+let histFrom = "", histTo = ""; // bornes du mode « libre »
+let histPerson = "all";     // livre dettes : personne sélectionnée
+/* Bornes d'une période : [du, au] en YYYY-MM-DD (pures — testées). Bornes vides = tout. */
+function histBounds(mode, off, today){
+  if (mode === "week"){
+    const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (today.getDay()+6)%7);
+    monday.setDate(monday.getDate() + off*7);
+    const sunday = new Date(monday); sunday.setDate(sunday.getDate()+6);
+    return [ymd(monday), ymd(sunday)];
+  }
+  if (mode === "month"){
+    const d = new Date(today.getFullYear(), today.getMonth()+off, 1);
+    return [ymd(d), ymd(new Date(d.getFullYear(), d.getMonth()+1, 0))];
+  }
+  if (mode === "year") return [`${today.getFullYear()+off}-01-01`, `${today.getFullYear()+off}-12-31`];
+  return ["", ""];
+}
+/* Une date est-elle dans la borne [du, au] ? Bornes vides = illimitées de ce côté. */
+function inHistRange(d, from, to){
+  d = String(d || "");
+  if (from && d < from) return false;
+  if (to && d > to) return false;
+  return true;
+}
+/* Bornes effectives du filtre courant (le « libre » est trié du → au, bornes vides = illimitées) */
+function histEffectiveRange(){
+  if (histMode === "all") return ["", ""];
+  if (histMode === "custom"){
+    if (!histFrom) return ["", histTo];
+    if (!histTo) return [histFrom, ""];
+    return histFrom > histTo ? [histTo, histFrom] : [histFrom, histTo];
+  }
+  return histBounds(histMode, histOff, new Date());
+}
+/* Applique le filtre période (+ personne en livre dettes) sur une liste — factorisé aux deux livres */
+function histFilterPeriod(items){
+  const [from, to] = histEffectiveRange();
+  if (from || to) items = items.filter(e => inHistRange(e.date, from, to));
+  if (state.kind === "dettes" && histPerson !== "all") items = items.filter(e => e.name === histPerson);
+  return items;
+}
+/* Libellé de la période active pour la barre ← → */
+function histNavLabel(){
+  const [a, b] = histBounds(histMode, histOff, new Date());
+  const loc = I18N_LOCALE();
+  if (histOff === 0) return histMode === "week" ? t("Cette semaine") : histMode === "month" ? t("Ce mois-ci") : t("Cette année");
+  if (histMode === "month") return new Date(a+"T12:00:00").toLocaleDateString(loc, {month:"long", year:"numeric"});
+  if (histMode === "year") return a.slice(0,4);
+  const f = {day:"numeric", month:"short"};
+  return new Date(a+"T12:00:00").toLocaleDateString(loc, f) + " – " + new Date(b+"T12:00:00").toLocaleDateString(loc, f);
+}
+/* (Re)construit la barre de période, la navigation, les dates libres et les puces de personnes */
+function renderHistControls(){
+  if ((state.bookId || "") !== histBook){ // changement de livre : filtres réinitialisés
+    histBook = state.bookId || "";
+    histMode = "all"; histOff = 0; histFrom = ""; histTo = ""; histPerson = "all";
+  }
+  if (!HIST_MODES.includes(histMode)) histMode = "all";
+  const segP = document.getElementById("hist-period");
+  segP.dataset.m = histMode;
+  segP.innerHTML = [["all",t("Tout")],["week",t("Semaine")],["month",t("Mois")],["year",t("Année")],["custom",t("Libre")]]
+    .map(([k,l]) => `<button class="${k===histMode?'on':''}" data-m="${k}">${esc(l)}</button>`).join("");
+  const nav = document.getElementById("hist-nav");
+  const dates = document.getElementById("hist-dates");
+  nav.style.display = (histMode === "all" || histMode === "custom") ? "none" : "";
+  dates.style.display = histMode === "custom" ? "" : "none";
+  if (nav.style.display === ""){
+    document.getElementById("hist-nav-next").disabled = histOff >= 0;
+    document.getElementById("hist-nav-label").textContent = histNavLabel();
+  }
+  if (dates.style.display === ""){
+    document.getElementById("hist-from").value = histFrom;
+    document.getElementById("hist-to").value = histTo;
+  }
+  // puces de personnes — livre dettes uniquement, dès que 2 personnes cohabitent
+  const pers = document.getElementById("hist-person");
+  const persons = state.kind === "dettes"
+    ? [...new Set(state.debts.map(d=>String(d.name||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b))
+    : [];
+  if (persons.length >= 2){
+    if (histPerson !== "all" && !persons.includes(histPerson)) histPerson = "all";
+    pers.style.display = "";
+    pers.innerHTML = `<button class="chip ${histPerson==="all"?'on':''}" data-p="all">${esc(t("Tout"))}</button>` +
+      persons.map(p => `<button class="chip ${histPerson===p?'on':''}" data-p="${esc(p)}">${esc(p)}</button>`).join("");
+  } else {
+    pers.style.display = "none"; pers.innerHTML = "";
+    if (!persons.length) histPerson = "all";
+  }
+}
 let histShown = HIST_PAGE;
 /* Historique d'un livre dettes : chronologie dettes/créances + remboursements */
 function applyDebtHistoryFilter(){
@@ -732,6 +827,7 @@ function applyDebtHistoryFilter(){
   if (f === "dois") items = items.filter(e => e.dir === "dois");
   else if (f === "me") items = items.filter(e => e.dir === "me");
   else if (f === "pays") items = items.filter(e => e.t === "pay");
+  items = histFilterPeriod(items);
   if (q) items = items.filter(e => e.name.toLowerCase().includes(q));
   document.getElementById("history-sub").textContent = tt("{n} entrée(s)", { n: items.length })
     + (f === "pays" && items.length ? " · " + money(items.reduce((s,e)=>s+e.amount,0)) : "");
@@ -749,8 +845,12 @@ function applyDebtHistoryFilter(){
 function renderDebtHistoryList(items){
   const host = document.getElementById("history-list");
   if (!items.length){
-    host.innerHTML = emptyState("🤝", t("Aucune dette pour le moment."),
-      t("Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit."));
+    if (histPerson !== "all")
+      host.innerHTML = emptyState("👤", tt("Aucune entrée avec « {a} »", { a: histPerson }),
+        t("Choisis « Tout » ou une autre personne."));
+    else
+      host.innerHTML = emptyState("🤝", t("Aucune dette pour le moment."),
+        t("Tape ＋ pour suivre ce que tu dois ou ce qu'on te doit."));
     return;
   }
   const groups = {};
@@ -773,11 +873,14 @@ function renderDebtHistoryList(items){
   host.innerHTML = html;
 }
 function applyHistoryFilter(){
+  renderHistControls();
+  renderHistFilter();   // les chips changent selon le type de livre — toujours re-rendues ici
   if (state.kind === "dettes") return applyDebtHistoryFilter();
   const f = document.getElementById("hist-filter").dataset.c || "all";
   const q = (document.getElementById("hist-search").value||"").toLowerCase().trim();
   const all = [...state.expenses].sort(byRecent);
   let items = f==="all" ? all : all.filter(e=>e.cat===f);
+  items = histFilterPeriod(items);
   if (q) items = items.filter(e=> e.name.toLowerCase().includes(q) || catOf(e.cat).label.toLowerCase().includes(q));
   const total = items.reduce((s,e)=>s+e.amount,0);
   document.getElementById("history-sub").textContent =
@@ -788,6 +891,7 @@ function applyHistoryFilter(){
     const c = catOf(f);
     if (q) emptyMsg = emptyState("🔍", tt("Aucun résultat pour « {a} »", {a: esc(q)}), t("Vérifie l'orthographe ou essaie un autre mot."));
     else if (f !== "all") emptyMsg = emptyState(c.emoji, tt("Rien en {a} pour le moment", {a: esc(c.label)}), t("Ajoute une dépense dans cette catégorie — ou vois tout."));
+    else if (histMode !== "all") emptyMsg = emptyState("🗓️", t("Rien sur cette période"), t("Essaie une autre période — ou vois tout."));
   }
   renderList("history-list", shown, false, emptyMsg);
   if (items.length > shown.length){

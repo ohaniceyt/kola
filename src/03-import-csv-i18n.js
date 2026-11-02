@@ -553,6 +553,18 @@ const I18N_EN = {
   "✓ Montant détecté — vérifie avant d'ajouter":"✓ Amount detected — check before adding",
   "⚠️ Montant non détecté — complète-le à la main":"⚠️ Amount not detected — fill it in manually",
   "photo et reconnaissance du texte : le 1ᵉʳ chargement (~5 Mo) demande le réseau":"photo and text recognition: first download (~5 MB) needs network",
+  /* --- Historique : période, navigation, personnes --- */
+  "Libre":"Custom",
+  "Cette semaine":"This week",
+  "Ce mois-ci":"This month",
+  "Cette année":"This year",
+  "Rien sur cette période":"Nothing in this period",
+  "Essaie une autre période — ou vois tout.":"Try another period — or view all.",
+  "Choisis « Tout » ou une autre personne.":"Pick « All » or another person.",
+  "Période précédente":"Previous period",
+  "Période suivante":"Next period",
+  "Du":"From",
+  "Au":"To",
 };
 /* Chaînes paramétrées (l'EN remplace le gabarit, {x} remplacés par les params) */
 const I18N_EN_T = {
@@ -645,7 +657,9 @@ const I18N_EN_T = {
   "Bonsoir":"Good evening",
   "1 dépense":"1 expense",
   "1 récurrence":"1 recurring expense",
-  "et":"and"
+  "et":"and",
+  /* --- Historique --- */
+  "Aucune entrée avec « {a} »":"No entries with « {a} »"
 };
 function i18nLang(){
   const set = state && state.lang;

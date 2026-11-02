@@ -509,5 +509,35 @@ check(!isDebtsCsv('Date;Libellé;Montant\n10/09/2026;Netflix;-13,49'),
       "isDebtsCsv : relevé bancaire normal non capté");
 check(!isDebtsCsv(''), "isDebtsCsv : vide → non");
 
+/* ======== Historique : bornes de période (semaine / mois / année) + filtre de dates ======== */
+const histFns = new Function("ymd", grab("function histBounds(", "function histNavLabel") +
+  "return { histBounds, inHistRange };")(
+  d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+const { histBounds, inHistRange } = histFns;
+/* histEffectiveRange : le « libre » tolère les bornes vides (jamais de borne inversée par "")
+   Les variables sont des `let` du module source, hors de la section extraite : on les injecte
+   en paramètres à chaque cas (stubs : histBounds n'est pas sous test ici). */
+const histRange = (mode, a, b) => new Function("histMode", "histFrom", "histTo", "histOff", "histBounds",
+  grab("function histEffectiveRange(", "function histFilterPeriod") + "return { histEffectiveRange };")(
+    mode, a, b, 0, () => ["", ""]).histEffectiveRange();
+eq(histRange("custom", "2026-11-01", "2999-12-31"), ["2026-11-01", "2999-12-31"], "histEffectiveRange : les deux bornes (du → au)");
+eq(histRange("custom", "2026-11-01", ""), ["2026-11-01", ""], "histEffectiveRange : Au vide → illimité vers le futur");
+eq(histRange("custom", "", "2026-12-31"), ["", "2026-12-31"], "histEffectiveRange : Du vide → illimité vers le passé");
+eq(histRange("custom", "", ""), ["", ""], "histEffectiveRange : tout vide → tout");
+eq(histRange("custom", "2026-11-01", "2025-12-31"), ["2025-12-31", "2026-11-01"], "histEffectiveRange : bornes saisies à l'envers → triées");
+eq(histRange("all", "x", "y"), ["", ""], "histEffectiveRange : mode Tout → aucune borne");
+// Le 2 nov. 2026 est un lundi
+eq(histBounds("week", 0, new Date(2026,10,2)), ["2026-11-02","2026-11-08"], "histBounds : semaine courante (lundi → dimanche)");
+eq(histBounds("week", -1, new Date(2026,10,2)), ["2026-10-26","2026-11-01"], "histBounds : semaine précédente à cheval sur 2 mois");
+eq(histBounds("week", 0, new Date(2026,10,8)), ["2026-11-02","2026-11-08"], "histBounds : dimanche toujours dans la même semaine");
+eq(histBounds("month", 0, new Date(2026,10,5)), ["2026-11-01","2026-11-30"], "histBounds : mois courant (30 jours)");
+eq(histBounds("month", -1, new Date(2026,10,5)), ["2026-10-01","2026-10-31"], "histBounds : mois précédent (octobre, 31 jours)");
+eq(histBounds("month", -11, new Date(2026,10,5)), ["2025-12-01","2025-12-31"], "histBounds : -11 mois rebascule sur décembre 2025");
+eq(histBounds("year", 0, new Date(2026,10,5)), ["2026-01-01","2026-12-31"], "histBounds : année courante");
+eq(histBounds("year", -1, new Date(2026,10,5)), ["2025-01-01","2025-12-31"], "histBounds : année précédente");
+check(inHistRange("2026-11-02","2026-11-02","2026-11-08") && !inHistRange("2026-11-09","2026-11-02","2026-11-08")
+  && !inHistRange("2026-11-01","2026-11-02","2026-11-08") && inHistRange("2026-01-01","",""),
+  "inHistRange : bornes incluses, hors bornes exclues, bornes vides = tout");
+
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

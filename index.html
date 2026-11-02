@@ -180,6 +180,18 @@
     <div class="sub" id="history-sub"></div>
   </div>
   <div class="segmented" id="hist-filter" data-c="all"></div>
+  <div class="segmented" id="hist-period" data-m="all"></div>
+  <div class="hist-nav" id="hist-nav" style="display:none">
+    <button id="hist-nav-prev" aria-label="Période précédente">‹</button>
+    <div class="l" id="hist-nav-label" aria-live="polite"></div>
+    <button id="hist-nav-next" aria-label="Période suivante">›</button>
+  </div>
+  <div class="hist-dates" id="hist-dates" style="display:none">
+    <input type="date" id="hist-from" aria-label="Du">
+    <span>→</span>
+    <input type="date" id="hist-to" aria-label="Au">
+  </div>
+  <div class="chips person-chips" id="hist-person" style="display:none"></div>
   <div class="search-box">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="17" height="17"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="hist-search" aria-label="Rechercher une dépense" type="search" placeholder="Rechercher une dépense…" autocomplete="off">
@@ -370,7 +382,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.18</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.19</div></div>
   </div>
 </div>
 

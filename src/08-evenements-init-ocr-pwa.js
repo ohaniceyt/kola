@@ -12,6 +12,32 @@ document.getElementById("hist-filter").addEventListener("click", e=>{
   histShown = HIST_PAGE;   // nouveau filtre : on repart en haut de la liste
   renderHistory();
 });
+document.getElementById("hist-period").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  histMode = b.dataset.m; histOff = 0;
+  if (histMode === "custom" && !histFrom && !histTo){
+    const [a, z] = histBounds("month", 0, new Date());
+    histFrom = a; histTo = z;       // libelle prérempli avec le mois courant
+  }
+  histShown = HIST_PAGE;
+  renderHistory();
+});
+document.getElementById("hist-nav-prev").addEventListener("click", ()=>{
+  histOff -= 1; histShown = HIST_PAGE; renderHistory();
+});
+document.getElementById("hist-nav-next").addEventListener("click", ()=>{
+  histOff = Math.min(histOff + 1, 0); histShown = HIST_PAGE; renderHistory();
+});
+document.getElementById("hist-from").addEventListener("change", e=>{
+  histFrom = e.target.value || ""; histShown = HIST_PAGE; renderHistory();
+});
+document.getElementById("hist-to").addEventListener("change", e=>{
+  histTo = e.target.value || ""; histShown = HIST_PAGE; renderHistory();
+});
+document.getElementById("hist-person").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  histPerson = b.dataset.p; histShown = HIST_PAGE; renderHistory();
+});
 document.getElementById("budget-input").addEventListener("change", e=>{
   const v=parseAmount(e.target.value);
   if (v > 0){ state.budget=v; save(); toast("Budget mis à jour"); }

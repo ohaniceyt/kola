@@ -535,3 +535,25 @@
   }
   .ob-toggle-lbl { font-size:16px; font-weight:600; }
   .step-note { font-size:13px; color:var(--tertiary-label); text-align:center; margin-top:12px; }
+
+  /* ---------- Historique : période, navigation ← →, dates libres, personnes ---------- */
+  .hist-nav { display:flex; align-items:center; gap:8px; margin:8px 16px 2px; }
+  .hist-nav button {
+    border:0; cursor:pointer; font-family:inherit; flex:0 0 auto;
+    background:var(--fill); color:var(--label); width:44px; height:32px; border-radius:9px;
+    font-size:20px; line-height:1; transition:background .15s;
+  }
+  .hist-nav button:active { background:rgba(var(--accent-rgb),.12); }
+  .hist-nav button:disabled { opacity:.35; }
+  .hist-nav .l {
+    flex:1; min-width:0; text-align:center; font-size:14px; font-weight:600;
+    color:var(--label); text-transform:capitalize;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .hist-dates { display:flex; align-items:center; gap:10px; margin:8px 16px 2px; }
+  .hist-dates input[type="date"] {
+    flex:1; min-width:0; background:var(--fill); border:0; border-radius:9px;
+    padding:9px 10px; font-family:inherit; font-size:14px; color:var(--label);
+  }
+  .hist-dates span { color:var(--secondary-label); flex:0 0 auto; }
+  .person-chips { flex-wrap:wrap; overflow:visible; padding:8px 16px 2px; }

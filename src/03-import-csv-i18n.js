@@ -656,6 +656,8 @@ const I18N_EN = {
   "Montant du revenu":"Income amount",
   "Date du revenu":"Income date",
   "Rechercher un revenu…":"Search for an income…",
+  "Déplacer vers la gauche":"Move left",
+  "Déplacer vers la droite":"Move right",
 };
 /* Chaînes paramétrées (l'EN remplace le gabarit, {x} remplacés par les params) */
 const I18N_EN_T = {

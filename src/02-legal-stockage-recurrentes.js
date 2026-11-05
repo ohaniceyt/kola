@@ -19,7 +19,7 @@ const LEGAL = {
     ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
           "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
     ["h", "Version", "Version"],
-    ["p", "Kola v0.20 — dernière mise à jour : novembre 2026.", "Kola v0.20 — last updated: November 2026."],
+    ["p", "Kola v0.21 — dernière mise à jour : novembre 2026.", "Kola v0.21 — last updated: November 2026."],
   ],
   confidentialite: [
     ["h", "L'essentiel", "The essentials"],
@@ -138,12 +138,18 @@ function renderBookSheet(){
   const rows = getBooks().map(b => {
     if (b.id === bookEditId) return editRow(b.name, b.emoji, b.data.kind);
     const dettesB = b.data.kind === "dettes";
-    const n = dettesB ? (b.data.debts || []).length : (b.data.expenses || []).length;
+    const n = bookCount(b);
     const trash = getBooks().length > 1 ? `<div class="rowbtn" onclick="event.stopPropagation();bookAskDelete('${b.id}')" role="button" tabindex="0">🗑️</div>` : "";
+    // flèches ⟪ ⟫ : réorganise l'ordre des livres (masquées pendant l'édition)
+    const mvLeft = bookEditId === null && b.id !== getBooks()[0].id
+      ? `<div class="rowbtn" onclick="event.stopPropagation();bookMove('${b.id}',-1)" role="button" tabindex="0" aria-label="${esc(t("Déplacer vers la gauche"))}">‹</div>` : "";
+    const mvRight = bookEditId === null && b.id !== getBooks()[getBooks().length-1].id
+      ? `<div class="rowbtn" onclick="event.stopPropagation();bookMove('${b.id}',1)" role="button" tabindex="0" aria-label="${esc(t("Déplacer vers la droite"))}">›</div>` : "";
     return `<div class="setrow" style="cursor:pointer" onclick="bookSwitch('${b.id}')" role="button" tabindex="0">
       <div class="icon-badge" style="font-size:18px;background:var(--fill)">${esc(b.emoji)}</div>
       <div class="n">${esc(b.name)}${b.id === state.bookId ? ` <div class="bk-sub">${esc(t("Livre actuel"))}</div>` : ""}</div>
       <div class="v">${dettesB ? tt("{n} dette(s)", { n }) : b.data.kind === "rev" ? tt("{n} revenu(s)", { n }) : tt("{n} dépense(s)", { n })}</div>
+      ${mvLeft}${mvRight}
       <div class="rowbtn" onclick="event.stopPropagation();bookSwitchEdit('${b.id}')" role="button" tabindex="0" aria-label="${esc(t("Renommer"))}">✏️</div>
       ${trash}
     </div>`;

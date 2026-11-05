@@ -8,6 +8,7 @@
 
 ## 2. Livres & type
 - [ ] Créer un livre 🤝 Dettes (Réglages → Livres → Ajouter) : le segmented 📕/🤝 choix et s'enregistre
+- [ ] Flèches ‹ › dans la sheet Livres : réordonner les livres (la bookbar suit ; ‹/› absentes aux bords)
 - [ ] Basculer entre les deux livres depuis l'accueil (chips) : les données suivent, et **aucune dépense ne fuit dans le livre dettes** (et inversement)
 - [ ] Renommer + changer le type d'un livre existant : rien ne se perd
 

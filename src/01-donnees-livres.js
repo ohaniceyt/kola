@@ -217,6 +217,16 @@ function bookRename(id, name, emoji, kind){
   save(); render(); renderBookbar(); renderBooksRow();
   if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
 }
+/* Réorganise les livres : décale le livre de -1 (gauche) ou +1 (droite) dans la bookbar.
+   Seul l'ordre change — les données et le livre courant restent en place. */
+function bookMove(id, dir){
+  const i = state.books.findIndex(b => b.id === id);
+  const j = i + (dir < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= state.books.length) return;
+  const [b] = state.books.splice(i, 1);
+  state.books.splice(j, 0, b);
+  save(); renderBookSheet(); renderBookbar(); renderBooksRow();
+}
 function bookDelete(id){
   if (getBooks().length <= 1) return;
   const idx = state.books.findIndex(b => b.id === id); if (idx < 0) return;

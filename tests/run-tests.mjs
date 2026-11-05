@@ -288,7 +288,7 @@ const ndStub = l => Array.isArray(l)
   : [];
 const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", "t", "tt", "toast", "save", "render", "renderBookbar", "renderBooksRow", "document", "normalizeDebts", "normalizeIncomes",
   grab("/* ============ Livres (plusieurs suivis, un actif) ============ */", "function autoSplitBudget") +
-  "return { booksEnsure, bookStore, bookNew, bookSwitch, bookAdd, bookRename };")(
+  "return { booksEnsure, bookStore, bookNew, bookSwitch, bookAdd, bookRename, bookMove };")(
   s, () => ({ other:{label:"Autre",emoji:"📦",color:"#8e8e93"} }), e => "📦", x => x, x => x, (k,o) => k, () => {}, () => {},
   () => {}, () => {}, () => {}, docStub, ndStub, li => (Array.isArray(li) ? li : []));
 
@@ -324,6 +324,27 @@ const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", 
         && !/[<>]/.test(s.books[2].name)
         && Array.isArray(s.books[2].data.expenses) && s.books[2].data.expenses.length === 0,
         "livres : id en double régénéré + nom hostile neutralisé + expenses normalisées");
+}
+
+/* bookMove : réorganisation de l'ordre des livres (la bookbar suit) */
+{
+  const s = { budget: 0, expenses: [], budgets: {}, recurring: [], goals: [], cats: {} };
+  const F = makeBooks(s);
+  F.booksEnsure();                      // 1 livre
+  s.books.push({ id:"maison", name:"Maison", emoji:"🏠", data:{ expenses: [] } });
+  s.books.push({ id:"revenus", name:"Revenus", emoji:"📥", data:{ expenses: [] } });
+  const p = s.books[0].id;
+  // ordre initial : [Personnel, maison, revenus]
+  F.bookMove("revenus", -1);            // dernier → milieu
+  eq(s.books.map(b=>b.id), [p, "revenus", "maison"], "bookMove : décalage vers la gauche");
+  F.bookMove("revenus", +1);
+  eq(s.books.map(b=>b.id), [p, "maison", "revenus"], "bookMove : décalage vers la droite");
+  F.bookMove("revenus", +1);            // déjà dernier → no-op
+  eq(s.books.map(b=>b.id), [p, "maison", "revenus"], "bookMove : bord droit ignoré");
+  F.bookMove(p, -1);                    // déjà premier → no-op
+  eq(s.books[0].id, p, "bookMove : bord gauche ignoré");
+  F.bookMove("inconnu", 1);             // id absent : no-op
+  eq(s.books.length, 3, "bookMove : id inconnu → rien");
 }
 
 /* buildBackup : livre à plat (format ancien) ne gagne PAS de clé books */

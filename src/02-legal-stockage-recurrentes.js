@@ -19,7 +19,7 @@ const LEGAL = {
     ["p", "Kola n'utilise aucun cookie, aucun traceur ni aucun service de mesure d'audience. Aucune donnée personnelle n'est transmise lors de la consultation du site ou de l'utilisation de l'application.",
           "Kola uses no cookies, no trackers and no audience-measurement services. No personal data is transmitted when you visit the site or use the app."],
     ["h", "Version", "Version"],
-    ["p", "Kola v0.19 — dernière mise à jour : octobre 2026.", "Kola v0.19 — last updated: October 2026."],
+    ["p", "Kola v0.20 — dernière mise à jour : novembre 2026.", "Kola v0.20 — last updated: November 2026."],
   ],
   confidentialite: [
     ["h", "L'essentiel", "The essentials"],
@@ -54,8 +54,8 @@ const LEGAL = {
     ["p", "Kola ne peut être tenue responsable d'une perte de données liée à la désinstallation, au changement d'appareil, au vidage du stockage du navigateur ou à un navigateur en mode privé. Des sauvegardes régulières sont recommandées.",
           "Kola cannot be held liable for data loss caused by uninstalling, changing devices, clearing browser storage, or private browsing. Regular backups are recommended."],
     ["h", "Évolution", "Evolution"],
-    ["p", "Kola peut évoluer (fonctionnalités, corrections, thèmes). Toute modification substantielle des présentes conditions sera signalée dans l'application. Version : octobre 2026.",
-          "Kola may evolve (features, fixes, themes). Any substantial change to these terms will be announced in the app. Version: October 2026."],
+    ["p", "Kola peut évoluer (fonctionnalités, corrections, thèmes). Toute modification substantielle des présentes conditions sera signalée dans l'application. Version : novembre 2026.",
+          "Kola may evolve (features, fixes, themes). Any substantial change to these terms will be announced in the app. Version: November 2026."],
   ],
 };
 function openLegalSheet(key){
@@ -124,8 +124,9 @@ function renderBookSheet(){
     </div>
     <div class="setrow">
       <div class="segmented mini" style="flex:1" id="be-kindseg" role="group" aria-label="${esc(t("Type de livre"))}">
-        <button data-k="dep" type="button" class="${kind === "dettes" ? "" : "on"}" onclick="bookKindPick(this)">📕 ${esc(t("Dépenses"))}</button>
+        <button data-k="dep" type="button" class="${kind === "dep" ? "on" : ""}" onclick="bookKindPick(this)">📕 ${esc(t("Dépenses"))}</button>
         <button data-k="dettes" type="button" class="${kind === "dettes" ? "on" : ""}" onclick="bookKindPick(this)">🤝 ${esc(t("Dettes"))}</button>
+        <button data-k="rev" type="button" class="${kind === "rev" ? "on" : ""}" onclick="bookKindPick(this)">📥 ${esc(t("Revenus"))}</button>
       </div>
     </div>
     <div class="setrow">
@@ -142,7 +143,7 @@ function renderBookSheet(){
     return `<div class="setrow" style="cursor:pointer" onclick="bookSwitch('${b.id}')" role="button" tabindex="0">
       <div class="icon-badge" style="font-size:18px;background:var(--fill)">${esc(b.emoji)}</div>
       <div class="n">${esc(b.name)}${b.id === state.bookId ? ` <div class="bk-sub">${esc(t("Livre actuel"))}</div>` : ""}</div>
-      <div class="v">${dettesB ? tt("{n} dette(s)", { n }) : tt("{n} dépense(s)", { n })}</div>
+      <div class="v">${dettesB ? tt("{n} dette(s)", { n }) : b.data.kind === "rev" ? tt("{n} revenu(s)", { n }) : tt("{n} dépense(s)", { n })}</div>
       <div class="rowbtn" onclick="event.stopPropagation();bookSwitchEdit('${b.id}')" role="button" tabindex="0" aria-label="${esc(t("Renommer"))}">✏️</div>
       ${trash}
     </div>`;
@@ -160,7 +161,7 @@ function bookEditSave(){
   const e = (document.getElementById("be-emoji") || {}).value ?? "";
   if (!String(n).trim()){ toast(t("Nom du livre")); return; }
   const kb = document.querySelector("#be-kindseg button.on");
-  const kind = (kb && kb.dataset.k === "dettes") ? "dettes" : "dep";
+  const kind = (kb && kb.dataset.k === "dettes") ? "dettes" : (kb && kb.dataset.k === "rev") ? "rev" : "dep";
   if (bookEditId === "new") bookAdd(n, e, kind); else bookRename(bookEditId, n, e, kind);
   bookEditId = null;
   renderBookSheet();   // efface le formulaire d'édition resté affiché après l'enregistrement
@@ -170,6 +171,8 @@ function bookAskDelete(id){
   const b = getBooks().find(x => x.id === id); if (!b || getBooks().length <= 1) return;
   if (b.data.kind === "dettes"){
     if (confirm(tt("Supprimer le livre « {a} » et ses {n} dette(s) ? Action irréversible.", { a: b.name, n: (b.data.debts || []).length }))) bookDelete(id);
+  } else if (b.data.kind === "rev"){
+    if (confirm(tt("Supprimer le livre « {a} » et ses {n} revenu(s) ? Action irréversible.", { a: b.name, n: (b.data.incomes || []).length }))) bookDelete(id);
   } else if (confirm(tt("Supprimer le livre « {a} » et ses {n} dépense(s) ? Action irréversible.", { a: b.name, n: (b.data.expenses || []).length }))) bookDelete(id);
 }
 function bookKindPick(btn){

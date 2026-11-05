@@ -132,7 +132,7 @@
   </div>
 
   <div class="list-header" id="recent-header">
-    <span class="t">Récentes</span>
+    <span class="t" id="recent-title">Récentes</span>
     <button onclick="switchTab('history')">Tout voir</button>
   </div>
   <div id="recent-list"></div>
@@ -382,7 +382,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.19</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Kola v0.20</div></div>
   </div>
 </div>
 
@@ -882,6 +882,29 @@
   <button class="btn-primary" id="db-save" onclick="saveDebt()">Ajouter la dette</button>
   <button class="btn-ghost" id="db-delete" onclick="delDebt()" style="display:none;color:var(--red)">Supprimer</button>
   <button class="btn-ghost" onclick="closeDebtSheet()" style="color:var(--secondary-label)">Annuler</button>
+</div>
+
+<div class="sheet" id="income-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="income-sheet-title">Nouveau revenu</h2>
+  <div class="field">
+    <label>Source</label>
+    <input id="ic-name" aria-label="Source du revenu" type="text" maxlength="60" placeholder="Ex : Salaire, vente, cadeau…">
+  </div>
+  <div class="field">
+    <label>Montant</label>
+    <div class="amount-input">
+      <span class="cur" id="ic-cur">€</span>
+      <input id="ic-amount" aria-label="Montant du revenu" type="text" inputmode="decimal" placeholder="0,00">
+    </div>
+  </div>
+  <div class="field">
+    <label>Date</label>
+    <input id="ic-date" aria-label="Date du revenu" type="date">
+  </div>
+  <button class="btn-primary" id="ic-save" onclick="saveIncome()">Ajouter le revenu</button>
+  <button class="btn-ghost" id="ic-delete" onclick="delIncome()" style="display:none;color:var(--red)">Supprimer</button>
+  <button class="btn-ghost" onclick="closeIncomeSheet()" style="color:var(--secondary-label)">Annuler</button>
 </div>
 
 <div class="sheet" id="theme-sheet" role="dialog" aria-modal="true">

@@ -53,3 +53,10 @@
 ## 10. Hygiène
 - [ ] Aucun toast/erreur bizarre en usage normal
 - [ ] Si un bug : capture + note ici → issue
+## 5ter. Livre revenus 📥 (v0.20)
+- [ ] Livres → ＋ → type 📥 Revenus : l'accueil bascule (héros « Reçu ce mois » + « Derniers revenus », pas d'enveloppes/objectifs/couple/carte dettes, pas de rappel de sauvegarde)
+- [ ] ＋ → fiche revenu (Source / Montant / Date) ; tap sur une ligne → modifier/supprimer
+- [ ] Import d'un relevé en livre revenus : seuls les crédits arrivent ; en livre dépenses, le même relevé n'importe que les débits (jamais l'inverse)
+- [ ] Export CSV revenus : en livre dépenses, le fichier est refusé (« il ne s'importe pas ici »)
+- [ ] Aucune dépense ne fuit dans le livre revenus (accueil, historique, stats) — et en revenant en livre dépenses, « Récentes » et le titre sont restaurés
+- [ ] Historique revenus : Recherche + périodes (Tout/Semaine/Mois/Année/Libre + ← →) fonctionnent ; pas de filtres par catégorie

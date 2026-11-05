@@ -23,6 +23,30 @@ function normalizeDebts(list, todayIso){
   })).filter(d => d.amount > 0);
 }
 function debtRemain(d){ return Math.max(0, (+d.amount || 0) - (+d.paid || 0)); }
+/* Revenus du livre : normalisation identique aux dettes (anti-injection, jamais de crash)
+   { id: UUID, name: source, amount > 0, date: ISO, ts } — pas de catégorie, pas de sens. */
+function normalizeIncomes(list, todayIso){
+  const okDate = s => SAFE_DATE.test(s || "") && !Number.isNaN(new Date(s + "T00:00:00").getTime());
+  const today = todayIso || todayISO();
+  if (!Array.isArray(list)) return [];
+  return list.filter(e => e && typeof e === "object").map(e => ({
+    id: safeId(e.id),
+    name: String(e.name ?? "").slice(0, 60).trim() || "Revenu",
+    amount: +e.amount || 0,
+    date: okDate(e.date) ? e.date : today,
+    ts: (+e.ts && +e.ts > 1e12 && +e.ts < 9e15) ? +e.ts : 0
+  })).filter(e => e.amount > 0);
+}
+function incomeTotals(incomes){
+  const t = { month: 0, n: 0, max: 0, all: 0 };
+  const month = todayISO().slice(0,7);
+  (incomes || []).filter(e => e && typeof e === "object").forEach(e => {
+    t.all += +e.amount || 0;
+    if (String(e.date||"").startsWith(month)){ t.month += +e.amount || 0; t.n++; }
+    if ((+e.amount || 0) > t.max) t.max = +e.amount || 0;
+  });
+  return t;
+}
 function debtTotals(debts){
   const t = { dois: 0, me: 0, paidDois: 0, paidMe: 0, net: 0, pct: 0, pctDois: 0, pctMe: 0 };
   (debts || []).filter(d => d && typeof d === "object").forEach(d => {
@@ -294,8 +318,9 @@ function buildLedger(s){
     recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat: knownCat(r.cat) || "other", amount:+r.amount, freq:(r.freq||"m"), wd:+r.wd||0, day:Math.min(Math.max(+r.day||1,1),28), lastAdded: SAFE_DATE.test(r.lastAdded||"") ? r.lastAdded : "" })) : [],
     goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:safeId(g.id), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
     expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date, who: (e.who==="partner" || e.who==="shared") ? e.who : "me", ts: (+e.ts && +e.ts > 1e12 && +e.ts < 9e15) ? +e.ts : 0})),
-    kind: s.kind === "dettes" ? "dettes" : "dep",
-    debts: normalizeDebts(s.debts)
+    kind: s.kind === "dettes" ? "dettes" : s.kind === "rev" ? "rev" : "dep",   // BOOK_KINDS (harnais : bookKindOf n'est pas extrait)
+    debts: normalizeDebts(s.debts),
+    incomes: normalizeIncomes(s.incomes)
   };
 }
 function buildBackup(s){
@@ -346,7 +371,8 @@ function buildBackup(s){
       goals: act.data.goals,
       expenses: act.data.expenses,
       kind: act.data.kind,
-      debts: act.data.debts
+      debts: act.data.debts,
+      incomes: act.data.incomes
     };
   }
   // Format à plat (sauvegardes d'avant les livres)
@@ -367,7 +393,8 @@ function buildBackup(s){
     couple,
     expenses: led.expenses,
     kind: led.kind,
-    debts: led.debts
+    debts: led.debts,
+    incomes: led.incomes
   };
 }
 let backupPending = null;
@@ -398,7 +425,12 @@ function importDataFile(file){
       toast(t("C'est un export dettes Kola — il ne s'importe pas en relevé bancaire."));
       return;
     }
-    openCsvSheet(parseCsv(txt));                            // sinon : relevé bancaire CSV
+    if (isIncomesCsv(txt) && state.kind !== "rev"){         // export revenus : jamais des dépenses
+      toast(t("C'est un export revenus Kola — il ne s'importe pas ici."));
+      return;
+    }
+    // Livre revenus : un relevé est lu du côté crédits (l'argent entrant) uniquement
+    openCsvSheet(state.kind === "rev" ? parseCreditsCsv(txt) : parseCsv(txt));
   };
   fr.readAsText(file);
 }

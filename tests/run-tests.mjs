@@ -164,9 +164,11 @@ eq(nextOccur({freq:"w", wd:0}, "2026-10-05"), "2026-10-12", "nextOccur hebdo +7 
   const state = { expenses: [], recurring: [{ name: "Loyer", cat: "food", amount: 700, freq: "m", day: 5, lastAdded: "2026-09-05" }] };
   const fns = new Function("ymd", "todayISO", "state", "save", grab("/* ============ Dépenses récurrentes ============ */", "function renderRecurring") + "return { processRecurring };")(ymd, todayISO, state, () => {});
   fns.processRecurring();
-  check(state.expenses.length === 1, "rattrapage : 1 occurrence échue (octobre)");
+  // rattrapage complet : toutes les occurrences échues depuis le dernier ajout (5 de chaque mois)
+  const occ = 1 + (today >= "2026-11-05" ? 1 : 0);
+  check(state.expenses.length === occ, "rattrapage : occurrence(s) échue(s) depuis septembre");
   eq(state.expenses[0]?.date, "2026-10-05", "rattrapage : date de l'occurrence");
-  eq(state.recurring[0].lastAdded, (today >= "2026-10-05" && today < "2026-11-05") ? "2026-10-05" : state.recurring[0].lastAdded, "rattrapage : lastAdded avancé");
+  eq(state.recurring[0].lastAdded, occ === 1 ? "2026-10-05" : today, "rattrapage : lastAdded avancé");
   // nouvelle récurrence créée en cours de mois, jour déjà passé : rien d'inséré
   const st2 = { expenses: [], recurring: [{ name: "Netflix", cat: "fun", amount: 13.5, freq: "m", day: 1, lastAdded: "" }] };
   const fns2 = new Function("ymd", "todayISO", "state", "save", grab("/* ============ Dépenses récurrentes ============ */", "function renderRecurring") + "return { processRecurring };")(ymd, todayISO, st2, () => {});
@@ -284,11 +286,11 @@ const ndStub = l => Array.isArray(l)
       due: /^\d{4}-\d{2}-\d{2}$/.test(d.due || "") ? d.due : "" }))
     .filter(d => d.amount > 0)
   : [];
-const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", "t", "tt", "toast", "save", "render", "renderBookbar", "renderBooksRow", "document", "normalizeDebts",
+const makeBooks = s => new Function("state", "catDefaults", "safeEmoji", "esc", "t", "tt", "toast", "save", "render", "renderBookbar", "renderBooksRow", "document", "normalizeDebts", "normalizeIncomes",
   grab("/* ============ Livres (plusieurs suivis, un actif) ============ */", "function autoSplitBudget") +
   "return { booksEnsure, bookStore, bookNew, bookSwitch, bookAdd, bookRename };")(
   s, () => ({ other:{label:"Autre",emoji:"📦",color:"#8e8e93"} }), e => "📦", x => x, x => x, (k,o) => k, () => {}, () => {},
-  () => {}, () => {}, () => {}, docStub, ndStub);
+  () => {}, () => {}, () => {}, docStub, ndStub, li => (Array.isArray(li) ? li : []));
 
 /* Migration : état plat → un livre « Personnel » qui reprend les données + remontée à plat */
 {
@@ -538,6 +540,60 @@ eq(histBounds("year", -1, new Date(2026,10,5)), ["2025-01-01","2025-12-31"], "hi
 check(inHistRange("2026-11-02","2026-11-02","2026-11-08") && !inHistRange("2026-11-09","2026-11-02","2026-11-08")
   && !inHistRange("2026-11-01","2026-11-02","2026-11-08") && inHistRange("2026-01-01","",""),
   "inHistRange : bornes incluses, hors bornes exclues, bornes vides = tout");
+
+/* ======== Livre revenus 📥 ======== */
+const backupFns2 = new Function("SCHEMA_VERSION", "CATS", "todayISO", grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") + "return { buildBackup, normalizeDebts, normalizeIncomes, debtRemain, debtTotals, debtLedgerEntries, dueReminders };")(3, CATS, todayISO);
+const { normalizeIncomes } = backupFns2;
+const csvGuardFns2 = new Function(grab("function isIncomesCsv", "const HIST_PAGE") + "return { isIncomesCsv };")();
+const { isIncomesCsv } = csvGuardFns2;
+const creditsFns = new Function("normalizeCsvDate", "parseMoneyCell", grab("/* Livre revenus : le MÊME relevé, lu du côté des crédits", "let csvRows = null") + "return { parseCreditsCsv };")(normalizeCsvDate, parseMoneyCell);
+const { parseCreditsCsv } = creditsFns;
+/* normalizeIncomes : normalisation stricte (id, date, montant positif) */
+{
+  const r = normalizeIncomes([
+    { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Salaire", amount:450000, date:"2026-11-01", ts:1e12 },
+    { name:"Vente", amount:-5, date:"pas-une-date" },                       // montant ≤ 0 → exclu
+    { name:"", amount:120, date:"32/13/2026" },                             // date absurde → aujourd'hui
+    null, "garbage"
+  ]);
+  eq(r.length, 2, "normalizeIncomes : entrées invalides écartées");
+  eq([r[0].name, r[0].amount, r[0].date], ["Salaire", 450000, "2026-11-01"], "normalizeIncomes : entree intacte");
+  check(r[1].date === todayISO() && r[1].name === "Revenu", "normalizeIncomes : champs douteux normalisés");
+  eq(normalizeIncomes("garbage"), [], "normalizeIncomes : liste absente → []");
+}
+/* buildBackup : incomes validés anti-injection, kind rev préservé */
+{
+  const bk = backupFns2.buildBackup({
+    user: { name: "K" }, currency: "FCFA",
+    books: [ { id: "brev", name: "Revenus", emoji: "📥", data: { kind: "rev", expenses: [], incomes: [
+      { id: '"><img src=x onerror=alert(1)>', name: "Salaire", amount: 450000, date: "2026-11-01" },
+      { name: "Cadeau", amount: 25000, date: "2026-11-02" }
+    ] } } ], bookId: "brev"
+  });
+  const rb = bk.books[0];
+  eq(rb.data.kind, "rev", "buildBackup : type rev préservé");
+  check(rb.data.incomes.every(e => UUIDRE.test(e.id) && e.amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(e.date)),
+        "buildBackup : ids/dates/montants de revenus validés");
+  check(bk.incomes === undefined || Array.isArray(bk.incomes), "buildBackup : remontée à plat des revenus");
+  // garde : l'export revenus ne s'importe pas en livre dépenses
+  const revCsvHead = '"Date";"Type";"Source";"Montant"';
+  check(isIncomesCsv(revCsvHead + '\r\n"2026-11-01";"Revenu";"Salaire";"450000,00"'), "isIncomesCsv : export revenus reconnu");
+  check(!isDebtsCsv(revCsvHead), "isIncomesCsv : différent d'un export dettes");
+}
+/* parseCreditsCsv : miroir des dépenses — crédits seulement */
+{
+  const credits = parseCreditsCsv("Date;Libellé;Montant\n10/09/2026;Salaire;450000,00\n11/09/2026;Carrefour;-45,20");
+  eq(credits, [{ date:"2026-09-10", label:"Salaire", amount:450000 }],
+     "parseCreditsCsv : relevé signé → crédit seulement, débits ignorés");
+  eq(parseCreditsCsv("Date;Libellé;Débit;Crédit\n10/09/2026;Netflix;13,49;\n11/09/2026;Salaire;;1800,00"),
+     [{ date:"2026-09-11", label:"Salaire", amount:1800 }],
+     "parseCreditsCsv : colonnes Débit/Crédit → crédits seulement");
+  eq(parseCreditsCsv("Date;Libellé;Montant\n10/09/2026;Netflix;-13,49"), [],
+     "parseCreditsCsv : montant négatif = dépense, jamais un revenu");
+  eq(parseCreditsCsv("Date;Libellé;Montant\n10/09/2026;Netflix;13,49").length, 1,
+     "parseCreditsCsv : sans signes (miroir du relevé non signé) → positifs = revenus");
+  eq(parseCreditsCsv(""), [], "parseCreditsCsv : vide → rien");
+}
 
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

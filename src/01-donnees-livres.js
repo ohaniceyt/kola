@@ -11,7 +11,7 @@ const CATS = {
 const DAY = 864e5;
 let state = null;
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 function stateInit(raw){
   try {
     state = raw ? JSON.parse(raw) : null;
@@ -30,8 +30,9 @@ function stateInit(raw){
   if (!state.recurring) { state.recurring = []; }
   if (!state.goals) { state.goals = []; }
   if (!state.user) { state.user = { name:"" }; }
-  if (state.kind !== "dettes") state.kind = "dep";          // type du livre courant (dépenses par défaut)
+  if (state.kind !== "dettes" && state.kind !== "rev") state.kind = "dep";   // type du livre courant (dépenses par défaut)
   if (!Array.isArray(state.debts)) state.debts = [];        // dettes du livre courant
+  if (!Array.isArray(state.incomes)) state.incomes = [];    // revenus du livre courant
   if (!state.couple) state.couple = { on:false, partner:"", sentIds:[], lastAt:"" };
   if (!Array.isArray(state.couple.sentIds)) state.couple.sentIds = [];
   if (typeof state.couple.on !== "boolean") state.couple.on = false;
@@ -91,8 +92,11 @@ function catDefaults(){
    et ses catégories ; le reste (profil, monnaie, couple, langue) reste global.
    Le livre courant est remonté dans `state` (champs à plat) : tout le code
    existant (stats, historique, vues, couple) lit l'état à plat sans le savoir. */
-const BOOK_FIELDS = ["budget","expenses","budgets","recurring","goals","cats","kind","debts"];
+const BOOK_FIELDS = ["budget","expenses","budgets","recurring","goals","cats","kind","debts","incomes"];
 const SAFE_BOOK_ID = /^[a-z0-9-]{1,24}$/i;
+/* Type d'un livre : dep (dépenses), dettes (créances/dettes), rev (revenus) */
+const BOOK_KINDS = ["dep","dettes","rev"];
+const bookKindOf = k => BOOK_KINDS.includes(k) ? k : "dep";
 /* Thèmes : l'accent (et les dégradés) par livre — ou global si le livre n'en définit pas */
 const THEMES = [
   // a : accent (gros glyphs, FAB, dégradés boutons) ≥ 3:1 sur blanc en gros texte
@@ -126,7 +130,7 @@ function bookNew(name, emoji, id, kind){
   if (!id || !SAFE_BOOK_ID.test(id)) id = "b" + Date.now().toString(36) + (+(bookSeq++) + Math.floor(Math.random()*36)).toString(36);
   return { id, name: safeBookName(name), emoji: safeEmoji(emoji || "📖"),
            data: { budget: 0, expenses: [], budgets: {}, recurring: [], goals: [], cats: catDefaults(),
-                   kind: kind === "dettes" ? "dettes" : "dep", debts: [] } };
+                   kind: bookKindOf(kind), debts: [], incomes: [] } };
 }
 function curBook(){
   const bs = getBooks();
@@ -144,8 +148,9 @@ function booksEnsure(){
               recurring: Array.isArray(state.recurring) ? state.recurring : [],
               goals: Array.isArray(state.goals) ? state.goals : [],
               cats: catsOk(state.cats) ? state.cats : catDefaults(),
-              kind: state.kind === "dettes" ? "dettes" : "dep",
-              debts: normalizeDebts(state.debts) } }];
+              kind: bookKindOf(state.kind),
+              debts: normalizeDebts(state.debts),
+              incomes: Array.isArray(state.incomes) ? state.incomes : [] } }];
   }
   const seen = new Set();
   state.books = state.books.filter(b => b && typeof b === "object").map(b => {
@@ -162,8 +167,9 @@ function booksEnsure(){
     if (!Array.isArray(b.data.recurring)) b.data.recurring = [];
     if (!Array.isArray(b.data.goals)) b.data.goals = [];
     if (!catsOk(b.data.cats)) b.data.cats = catDefaults();
-    b.data.kind = (b.data.kind === "dettes") ? "dettes" : "dep";
+    b.data.kind = bookKindOf(b.data.kind);
     b.data.debts = normalizeDebts(b.data.debts);
+    b.data.incomes = normalizeIncomes(b.data.incomes);
     return b;
   });
   if (!state.bookId || !seen.has(state.bookId)) state.bookId = state.books[0].id;
@@ -176,7 +182,7 @@ function bookStore(){
   const b = curBook(); if (!b) return;
   b.data = { budget: +state.budget || 0, expenses: state.expenses, budgets: state.budgets,
              recurring: state.recurring, goals: state.goals, cats: state.cats,
-             kind: state.kind === "dettes" ? "dettes" : "dep", debts: state.debts };
+             kind: bookKindOf(state.kind), debts: state.debts, incomes: state.incomes };
 }
 function bookSwitch(id){
   const b = getBooks().find(x => x.id === id);
@@ -202,7 +208,7 @@ function bookRename(id, name, emoji, kind){
   const b = getBooks().find(x => x.id === id); if (!b) return;
   b.name = safeBookName(name);
   b.emoji = safeEmoji(emoji || b.emoji);
-  if ((kind === "dettes" || kind === "dep") && b.data.kind !== kind){
+  if ( BOOK_KINDS.includes(kind) && b.data.kind !== kind){
     // Bascule de type : les données de l'ancien type restent intègres (cachées, pas perdues)
     b.data.kind = kind;
     if (id === state.bookId) state.kind = kind;
@@ -224,10 +230,17 @@ function bookDelete(id){
   if (document.getElementById("book-sheet").classList.contains("show")) renderBookSheet();
   toast(tt("🗑️ Livre « {a} » supprimé", { a: gone.name }));
 }
+/* Nombre d'entrées à afficher sur la chip d'un livre (selon son type) */
+function bookCount(b){
+  const d = (b && b.data) || {};
+  return (d.kind === "dettes" ? (d.debts || []).length
+        : d.kind === "rev" ? (d.incomes || []).length
+        : (d.expenses || []).length);
+}
 function renderBookbar(){
   const bar = document.getElementById("bookbar"); if (!bar) return;
   bar.innerHTML = getBooks().map(b =>
-    `<button class="book-chip${b.id === state.bookId ? " on" : ""}" onclick="bookSwitch('${b.id}')" aria-label="${esc(b.name)}">${esc(b.emoji)} ${esc(b.name)} <span class="cnt">${b.data.kind === "dettes" ? (b.data.debts || []).length : (b.data.expenses || []).length}</span></button>`
+    `<button class="book-chip${b.id === state.bookId ? " on" : ""}" onclick="bookSwitch('${b.id}')" aria-label="${esc(b.name)}">${esc(b.emoji)} ${esc(b.name)} <span class="cnt">${bookCount(b)}</span></button>`
   ).join("") + `<button class="book-chip add" onclick="openBookSheet()" aria-label="${esc(t("Modifier les livres"))}">＋ ${esc(t("Livres"))}</button>`;
 }
 function renderBooksRow(){

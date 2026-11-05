@@ -8,6 +8,7 @@ function weekBounds(offset){
 }
 function renderStats(period){
   if (state.kind === "dettes") return renderStatsDettes();
+  if (state.kind === "rev") return renderStatsRevenus(period);
   // Restaure l'habillage dépenses (peut avoir été masqué en livre dettes)
   const segEl = document.getElementById("stat-seg"); if (segEl) segEl.style.display = "";
   const st = document.getElementById("stats-sub"); if (st) st.textContent = t("Analyse de tes dépenses");
@@ -82,7 +83,93 @@ function renderStatsDettes(){
     <div class="stat"><div class="sv">${nb}</div><div class="sl">${t("Notées")}</div></div>
     <div class="stat"><div class="sv">${settled}</div><div class="sl">${t("Soldées")}</div></div>`;
 }
+/* Livre revenus : statistiques orientées revenus — jamais de dépense, jamais de mélange */
+function renderStatsRevenus(period){
+  const segEl = document.getElementById("stat-seg"); if (segEl) segEl.style.display = "";
+  const st = document.getElementById("stats-sub"); if (st) st.textContent = t("Analyse de tes revenus");
+  ["donut2-card","compare-card"].forEach(id => document.getElementById(id).style.display = "none");
+  document.getElementById("bars-card").style.display = "";
+  const now = new Date();
+  let items, lbl;
+  if (period==="month"){ items = state.incomes.filter(e=>e.date.startsWith(todayISO().slice(0,7))); lbl = "Reçu ce mois"; }
+  else if (period==="w"){
+    const [s, e2] = weekBounds(0);
+    items = state.incomes.filter(e=>e.date>=s && e.date<=e2); lbl = "Reçu cette semaine";
+  }
+  else { lbl = "Reçu cette année";
+    const y = now.getFullYear();
+    items = state.incomes.filter(e=>e.date.startsWith(String(y)));
+  }
+  const total = items.reduce((s,e)=>s+e.amount,0);
+  const days = period==="month" ? new Date().getDate()
+    : period==="w" ? Math.min(((now.getDay()+6)%7)+1, 7)
+    : Math.ceil((now-new Date(now.getFullYear(),0,1))/DAY);
+  document.getElementById("stat-grid").innerHTML = `
+    <div class="stat"><div class="sv">${money(total)}</div><div class="sl">${t(lbl)}</div></div>
+    <div class="stat"><div class="sv">${money(total/Math.max(days,1))}</div><div class="sl">${t("Moyenne / jour")}</div></div>
+    <div class="stat"><div class="sv">${items.length}</div><div class="sl">${t("Revenus")}</div></div>
+    <div class="stat"><div class="sv">${money(Math.max(...items.map(e=>e.amount),0))}</div><div class="sl">${t("Plus gros revenu")}</div></div>`;
+  // tendance mensuelle des revenus (6 derniers mois), même gabarit que les dépenses
+  const mm=[];
+  for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); const key=ymd(d).slice(0,7);
+    mm.push({key, label:d.toLocaleDateString(I18N_LOCALE(),{month:'short'}), v: state.incomes.filter(e=>e.date.startsWith(key)).reduce((s,e)=>s+e.amount,0)}); }
+  const mMax=Math.max(...mm.map(m=>m.v),1);
+  document.getElementById("bars").innerHTML = mm.map((m,i)=>
+    `<div class="col"><div class="stick ${i===mm.length-1?"":"other"}" style="height:${Math.max(m.v/mMax*100,3)}%"></div><div class="ml">${m.label}</div></div>`).join("");
+  if (!items.length && !state.incomes.length){
+    document.getElementById("stat-grid").innerHTML =
+      `<div class="stat" style="grid-column:1/-1;padding:26px 16px">${emptyState("📥", t("Pas encore de statistiques"), t("Enregistre ton premier revenu — Kola dessinera tes stats ici."))}</div>`;
+    document.getElementById("bars").innerHTML = "";
+  }
+}
 function renderHistory(){ applyHistoryFilter(); }
+
+/* ============ Sheet revenu ============ */
+let incomeEditId = null;
+function openIncomeSheet(id){
+  incomeEditId = id || null;
+  const e = incomeEditId ? state.incomes.find(x=>x.id===incomeEditId) : null;
+  document.getElementById("ic-cur").textContent = state.currency;
+  document.getElementById("ic-name").value = e ? e.name : "";
+  document.getElementById("ic-amount").value = e ? +e.amount.toFixed(2) : "";
+  document.getElementById("ic-date").value = e ? e.date : todayISO();
+  document.getElementById("ic-delete").style.display = e ? "" : "none";
+  document.getElementById("ic-save").textContent = e ? t("Enregistrer") : t("Ajouter le revenu");
+  document.getElementById("income-sheet-title").textContent = e ? t("Modifier le revenu") : t("Nouveau revenu");
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("income-sheet").classList.add("show"); syncScrollLock();
+  if (!KP_TOUCH) setTimeout(()=>document.getElementById("ic-name").focus(), 460);
+}
+function closeIncomeSheet(){
+  document.getElementById("income-sheet").classList.remove("show");
+  clearSheetOverlay(); syncScrollLock();
+}
+function saveIncome(){
+  const n = document.getElementById("ic-name").value.trim().slice(0, 60);
+  const a = parseAmount(document.getElementById("ic-amount").value);
+  if (!a || a <= 0){ toast(t("Entre un montant valide")); return; }
+  if (!n){ toast(t("Entre une source")); return; }
+  const date = document.getElementById("ic-date").value;
+  if (!SAFE_DATE.test(date)){ toast(t("Entre une date valide")); return; }
+  if (incomeEditId){
+    const e = state.incomes.find(x=>x.id===incomeEditId); if (!e) return;
+    Object.assign(e, { name:n, amount:a, date });
+    toast("✓ " + t("Revenu mis à jour"));
+  } else {
+    state.incomes.push({ id: crypto.randomUUID(), name:n, amount:a, date, ts: Date.now() });
+    toast("✓ " + t("Revenu ajouté"));
+  }
+  incomeEditId = null;
+  closeIncomeSheet(); save(); render();
+}
+function delIncome(){
+  const e = state.incomes.find(x=>x.id===incomeEditId); if (!e) return;
+  if (!confirm(tt("Supprimer ce revenu ({a} du {b}) ?", { a: money(e.amount), b: dayName(e.date) }))) return;
+  state.incomes = state.incomes.filter(x=>x.id!==incomeEditId);
+  incomeEditId = null;
+  closeIncomeSheet(); save(); render();
+  toast("🗑️ " + t("Revenu supprimé"));
+}
 
 /* ============ Sheet ============ */
 let pickedCat = "food";
@@ -99,6 +186,7 @@ function renderCatGrid(){
 }
 function openSheet(){
   if (state.kind === "dettes"){ openDebtSheet(); return; }
+  if (state.kind === "rev"){ openIncomeSheet(); return; }
   document.getElementById("sheet-cur").textContent = state.currency;
   selectedChipCat = null;
   pickedWho = "me";
@@ -198,6 +286,11 @@ let newEmoji = '📦', newColor = COLORS[0];
 
 function renderHistFilter(){
   const seg = document.getElementById("hist-filter");
+  if (state.kind === "rev"){   // revenus : pas de catégories ni de sens — recherche seule
+    seg.style.display = "none"; seg.innerHTML = "";
+    return;
+  }
+  seg.style.display = "";
   if (state.kind === "dettes"){
     // Livre dettes : filtres Tout / Je dois / On me doit / Remboursements
     let cur = seg.dataset.c || "all";
@@ -688,7 +781,7 @@ function updateChipSel(){
 
 /* ============ Comparatif vs mois précédent ============ */
 function renderCompare(){
-  if (state.kind === "dettes"){ document.getElementById("compare-card").style.display = "none"; return; }
+  if (state.kind !== "dep"){ document.getElementById("compare-card").style.display = "none"; return; }
   const host = document.getElementById("compare-host");
   const period = document.getElementById("stat-seg").dataset.p || "month";
   document.getElementById("compare-card").style.display = period==="year" ? "none" : "block";

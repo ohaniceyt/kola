@@ -104,16 +104,16 @@ function animateNumber(el, key, to, fmt){
   requestAnimationFrame(frame);
 }
 function renderHome(){
-  // Livre de type « dettes » : l'accueil bascule sur le suivi des dettes
-  const dettes = state.kind === "dettes";
+  // Livre « dettes » : l'accueil bascule sur le suivi des dettes ; « rev » : revenus
+  const dettes = state.kind === "dettes", rev = state.kind === "rev";
   ["couple-summary","envelopes-card","goals-card","repart-card"].forEach(id=>{
-    const el = document.getElementById(id); if (el) el.style.display = dettes ? "none" : "";
+    const el = document.getElementById(id); if (el) el.style.display = (dettes || rev) ? "none" : "";
   });
   const hmw = document.getElementById("hero-me-w"); if (hmw) hmw.style.display = dettes ? "" : "none";
   // Mini héros dettes/créances (livres dépenses seulement) : chaque sens sa ligne, jamais de net
   const mini = document.getElementById("hero-mini-w");
   if (mini){
-    if (!dettes && state.debts.length){
+    if (!dettes && !rev && state.debts.length){
       const tlD = debtTotals(state.debts);
       mini.style.display = "";
       animateNumber(document.getElementById("mini-dois"), "mini-dois:" + state.currency, tlD.dois, money);
@@ -125,7 +125,9 @@ function renderHome(){
   const rh = document.getElementById("recent-header"), rl = document.getElementById("recent-list"), dc = document.getElementById("dettes-card");
   if (rh) rh.style.display = dettes ? "none" : "";
   if (rl) rl.style.display = dettes ? "none" : "";   // les « Récentes » du livre précédent ne doivent pas fuir en livre dettes
-  if (dc) dc.style.display = "";   // visible dans les deux types : héros dettes et/ou carte (le rendu diffère)
+  if (dc) dc.style.display = state.kind === "dep" ? "" : "none";   // carte dettes : livres dépenses uniquement
+  const rt = document.getElementById("recent-title"); if (rt) rt.textContent = t("Récentes");   // restauré avant les branches rev/dettes
+  if (rev){ renderIncomeHome(); return; }   // livre revenus : héros mensuel + derniers revenus
   if (dettes){ backupReminder(); renderDettesHome(); return; }
   const month = todayISO().slice(0,7);
   const spent = state.expenses.filter(e=>e.date.startsWith(month)).reduce((s,e)=>s+e.amount,0);
@@ -156,6 +158,53 @@ function renderHome(){
   renderGoals();
   renderDettesCard();
   renderList("recent-list", [...state.expenses].sort(byRecent).slice(0,6), true);
+}
+
+/* ============ Livre revenus : accueil ============ */
+/* Héros mensuel (pas de budget, pas d'enveloppes) + derniers revenus */
+function renderIncomeHome(){
+  const tot = incomeTotals(state.incomes);
+  document.getElementById("hero-label").textContent = "📥 " + t("Reçu ce mois");
+  animateNumber(document.getElementById("hero-remaining"), "hero-rev:" + state.currency, tot.month, money);
+  document.getElementById("hero-spent").textContent = tot.month
+    ? tt("{n} revenu(s) ce mois", { n: tot.n })
+    : t("Tape ＋ pour enregistrer ce que tu reçois.");
+  const bar = document.getElementById("hero-bar"); bar.style.visibility = "hidden";
+  bar.firstElementChild.style.width = "100%";
+  const bc = document.getElementById("backup-card"); if (bc) bc.style.display = "none";  // pas de rappel d'archive : rien de dépensable ici
+  const rt = document.getElementById("recent-title"); if (rt) rt.textContent = t("Derniers revenus");
+  renderIncomeList("recent-list", [...state.incomes].sort(byRecent).slice(0,6), true);
+}
+/* Ligne d'un revenu (compte des dépenses : même gabarit, mais ＋ en vert et pas de catégorie) */
+function incomeRow(e){
+  return `<div class="rowitem" role="button" tabindex="0" onclick="openIncomeSheet('${e.id}')"
+    aria-label="${esc(tt("Revenu : {a}, {b}", { a: e.name, b: money(e.amount) }))}">
+    <div class="icon-badge" style="background:rgba(52,199,89,.16)">📥</div>
+    <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(dayName(e.date))}</div></div>
+    <div class="amt" style="color:var(--green)">+${money(e.amount)}</div>
+  </div>`;
+}
+/* Liste de revenus groupée par jour (accueil compact 2 jours, historique complet) */
+function renderIncomeList(elId, items, compact, emptyMsg){
+  const host = document.getElementById(elId);
+  if (!items.length){
+    host.innerHTML = emptyMsg || emptyState("📥", t("Aucun revenu pour le moment."), t("Tape ＋ pour enregistrer ce que tu reçois."));
+    return;
+  }
+  const groups = {};
+  items.forEach(e=>{ (groups[e.date] = groups[e.date]||[]).push(e); });
+  const dates = Object.keys(groups).sort().reverse();
+  let html = "";
+  if (compact){
+    let flat = [];
+    dates.slice(0,2).forEach(d=>groups[d].forEach(e=>flat.push(e)));
+    html = `<div class="group">${flat.map(incomeRow).join("")}</div>`;
+  } else {
+    dates.forEach(d=>{
+      html += `<div class="list-header"><span class="t" style="font-size:15px;color:var(--secondary-label);text-transform:capitalize">${esc(dayName(d))}</span></div><div class="group">${groups[d].map(incomeRow).join("")}</div>`;
+    });
+  }
+  host.innerHTML = html;
 }
 
 function drawDonut(svgId, legendId, byCat){

@@ -562,8 +562,9 @@ function closeBackupSheet(){
   clearSheetOverlay();
   backupPending = null;
 }
-/* Fusion dédoublonnée d'un ledger (dépenses, cats, enveloppes, objectifs, récurrences)
+/* Fusion dédoublonnée d'un ledger (dépenses, cats, enveloppes, objectifs, récurrences, revenus)
    dans une destination à plat — utilisée par le merge simple et le merge par livre. */
+const incomeKey = e => e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100);
 function mergeLedgerInto(dst, src){
   let added = 0;
   const key = e => e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100);
@@ -596,11 +597,18 @@ function mergeLedgerInto(dst, src){
       }
     }
   });
-  return { added, addedDebts };
+  let addedIncomes = 0;
+  if (!Array.isArray(dst.incomes)) dst.incomes = [];
+  (src.incomes||[]).forEach(i=>{
+    const k = i.date + "|" + String(i.name).trim().toLowerCase() + "|" + Math.round(+i.amount*100);
+    const mine = dst.incomes.find(x=> (x.id && x.id === i.id) || incomeKey(x) === k);
+    if (!mine){ dst.incomes.push(i); addedIncomes++; }
+  });
+  return { added, addedDebts, addedIncomes };
 }
 function applyBackupMerge(){
   const bk = backupPending; if (!bk) return;
-  let added = 0, addedDebts = 0;
+  let added = 0, addedDebts = 0, addedIncomes = 0;
   if (Array.isArray(bk.books) && bk.books.length){
     // Fichier multi-livres : fusion par id (sinon par nom, sinon nouveau livre)
     bk.books.forEach(sb=>{
@@ -608,20 +616,21 @@ function applyBackupMerge(){
       const mine = state.books.find(x=>x.id===sb.id) || state.books.find(x=>x.name===sb.name);
       if (mine){
         const r = mergeLedgerInto(mine.data, data);
-        added += r.added; addedDebts += r.addedDebts;
+        added += r.added; addedDebts += r.addedDebts; addedIncomes += r.addedIncomes;
         if (!+mine.data.budget && +data.budget) mine.data.budget = +data.budget;
         if (sb.theme && !mine.theme) mine.theme = sb.theme;   // adopte le thème du livre importé
       } else {
         state.books.push({ id: sb.id, name: sb.name, emoji: sb.emoji, ...(sb.theme ? { theme: sb.theme } : {}),
           data: { budget:+data.budget||0, expenses:(data.expenses||[]).slice(), budgets:{...(data.budgets||{})},
                   recurring:(data.recurring||[]).slice(), goals:(data.goals||[]).map(g=>({...g})), cats:{...(data.cats||{})},
-                  kind: data.kind === "dettes" ? "dettes" : "dep", debts:(data.debts||[]).map(d=>({...d, payments:(d.payments||[]).map(p=>({...p}))})) } });
+                  kind: bookKindOf(data.kind), debts:(data.debts||[]).map(d=>({...d, payments:(d.payments||[]).map(p=>({...p}))})),
+                  incomes:(data.incomes||[]).slice() } });
         added += (data.expenses||[]).length;
       }
     });
   } else {
     // Fichier à plat (ancien format) : fusion dans le livre courant
-    ({ added, addedDebts } = mergeLedgerInto({ expenses: state.expenses, cats: state.cats, budgets: state.budgets, goals: state.goals, recurring: state.recurring, debts: state.debts }, bk));
+    ({ added, addedDebts, addedIncomes } = mergeLedgerInto({ expenses: state.expenses, cats: state.cats, budgets: state.budgets, goals: state.goals, recurring: state.recurring, debts: state.debts, incomes: state.incomes }, bk));
     if (!state.budget && bk.budget) state.budget = bk.budget;
   }
   if (!state.user.name && bk.user.name) state.user.name = bk.user.name;
@@ -639,6 +648,7 @@ function applyBackupMerge(){
   save(); renderHistFilter(); switchTab("home"); render(); renderBookbar(); renderBooksRow();
   toast(tt("📥 {n} dépense(s) ajoutée(s) par fusion", {n: added}));
   if (addedDebts) toast(tt("🤝 {n} dette(s) fusionnée(s)", {n: addedDebts}));
+  if (addedIncomes) toast(tt("📥 {n} revenu(s) importé(s)", {n: addedIncomes}));
 }
 function applyBackupReplace(){
   const bk = backupPending; if (!bk) return;
@@ -693,6 +703,7 @@ function shareOrDownloadFallback(data, name){
 }
 function exportCSV(){
   if (state.kind === "dettes") return exportDebtsCSV();
+  if (state.kind === "rev") return exportIncomesCSV();
   const rows = [["Date","Libellé","Catégorie","Montant"]];
   [...state.expenses].sort((a,b)=>b.date.localeCompare(a.date)).forEach(e=>{
     rows.push([e.date, e.name, catOf(e.cat).label, e.amount.toFixed(2)]);
@@ -717,16 +728,31 @@ function exportDebtsCSV(){
     if (how === "downloaded") toast("📤 " + t("CSV des dettes exporté"));
   });
 }
+/* Livre revenus : CSV dédié (Date/Type/Source/Montant — ré-importable uniquement en livre revenus) */
+function exportIncomesCSV(){
+  const rows = [["Date","Type","Source","Montant"]];
+  [...state.incomes].sort((a,b)=>b.date.localeCompare(a.date)).forEach(e=>{
+    rows.push([e.date, t("Revenu"), e.name, (+e.amount).toFixed(2)]);
+  });
+  const csv = "﻿" + rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(";")).join("\r\n");
+  shareOrDownload(csv, "text/csv", "kola-revenus-" + todayISO() + ".csv", "📤 " + t("CSV des revenus exporté")).then(how=>{
+    if (how === "downloaded") toast("📤 " + t("CSV des revenus exporté"));
+  });
+}
 /* Les exports dettes ne doivent jamais se ré-importer comme relevés bancaires */
 function isDebtsCsv(txt){
   const first = String(txt || "").replace(/^[﻿\s]*/, "").split(/\r?\n/, 1)[0];
   return /"?Date"?;?\s*"?Type"?;?\s*"?Personne"?;?/i.test(first);
 }
+/* ... ni les exports revenus (Date;Type;Source;Montant) en dépenses en livre dépenses */
+function isIncomesCsv(txt){
+  const first = String(txt || "").replace(/^[﻿\s]*/, "").split(/\r?\n/, 1)[0];
+  return /"?Date"?;?\s*"?Type"?;?\s*"?Source"?;?/i.test(first);
+}
 const HIST_PAGE = 200;
 
 /* ============ Historique : filtre période + personne ============ */
-const HIST_MODES = ["all","week","month","year","custom"];
-let histBook = "";          // livre pour lequel les filtres sont mémorisés (réinitialisés si on change)
+const HIST_MODES = ["all","week","month","year","custom"];let histBook = "";          // livre pour lequel les filtres sont mémorisés (réinitialisés si on change)
 let histMode = "all";       // all | week | month | year | custom
 let histOff = 0;            // décalage : 0 = période courante, -1 = précédente, +1 = suivante
 let histFrom = "", histTo = ""; // bornes du mode « libre »
@@ -793,6 +819,7 @@ function renderHistControls(){
     .map(([k,l]) => `<button class="${k===histMode?'on':''}" data-m="${k}">${esc(l)}</button>`).join("");
   const nav = document.getElementById("hist-nav");
   const dates = document.getElementById("hist-dates");
+  document.getElementById("hist-search").placeholder = state.kind === "rev" ? t("Rechercher un revenu…") : t("Rechercher une dépense…");
   nav.style.display = (histMode === "all" || histMode === "custom") ? "none" : "";
   dates.style.display = histMode === "custom" ? "" : "none";
   if (nav.style.display === ""){
@@ -842,6 +869,31 @@ function applyDebtHistoryFilter(){
     host.appendChild(btn);
   }
 }
+/* Historique d'un livre revenus : chronologie de l'argent entrant */
+function applyIncomeHistoryFilter(){
+  const q = (document.getElementById("hist-search").value || "").toLowerCase().trim();
+  let items = [...state.incomes].sort(byRecent);
+  items = histFilterPeriod(items);
+  if (q) items = items.filter(e => e.name.toLowerCase().includes(q));
+  document.getElementById("history-sub").textContent =
+    tt("{n} revenu(s) · {t}", { n: items.length, t: money(items.reduce((s,e)=>s+e.amount,0)) });
+  const shown = items.slice(0, histShown);
+  let emptyMsg;
+  if (!items.length){
+    if (q) emptyMsg = emptyState("🔍", tt("Aucun résultat pour « {a} »", { a: esc(q) }), t("Vérifie l'orthographe ou essaie un autre mot."));
+    else if (histMode !== "all") emptyMsg = emptyState("🗓️", t("Rien sur cette période"), t("Essaie une autre période — ou vois tout."));
+    else emptyMsg = emptyState("📥", t("Aucun revenu pour le moment."), t("Tape ＋ pour enregistrer ce que tu reçois."));
+  }
+  renderIncomeList("history-list", shown, false, emptyMsg);
+  if (items.length > shown.length){
+    const host = document.getElementById("history-list");
+    const btn = document.createElement("button");
+    btn.className = "btn-ghost"; btn.style.margin = "8px 16px 0"; btn.style.width = "calc(100% - 32px)";
+    btn.textContent = tt("Afficher plus ({n} restantes)", { n: items.length - shown.length });
+    btn.onclick = () => { histShown += HIST_PAGE; applyIncomeHistoryFilter(); };
+    host.appendChild(btn);
+  }
+}
 function renderDebtHistoryList(items){
   const host = document.getElementById("history-list");
   if (!items.length){
@@ -876,6 +928,7 @@ function applyHistoryFilter(){
   renderHistControls();
   renderHistFilter();   // les chips changent selon le type de livre — toujours re-rendues ici
   if (state.kind === "dettes") return applyDebtHistoryFilter();
+  if (state.kind === "rev") return applyIncomeHistoryFilter();
   const f = document.getElementById("hist-filter").dataset.c || "all";
   const q = (document.getElementById("hist-search").value||"").toLowerCase().trim();
   const all = [...state.expenses].sort(byRecent);

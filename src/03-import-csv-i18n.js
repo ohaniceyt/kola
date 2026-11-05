@@ -109,15 +109,75 @@ function parseCsv(text){
   out.forEach(r=> r.amount = Math.abs(r.amount));
   return out;
 }
+/* Livre revenus : le MÊME relevé, lu du côté des crédits — l'argent entrant uniquement,
+   jamais une dépense (miroir de parseCsv : un négatif ne devient jamais un revenu). */
+function parseCreditsCsv(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim());
+  if (!lines.length) return [];
+  const head = lines.slice(0,5).join("\n");
+  const delim = [";","\t",",",null].filter((d,i)=>d!==null).sort((a,b)=>
+    (head.split(b).length - head.split(a).length))[0];
+  const rows = lines.map(l=>{
+    const cells = l.split(delim).map(c=>c.trim().replace(/^"(.*)"$/,"$1"));
+    return cells;
+  }).filter(c=>c.length >= 2);
+  const first = rows[0].join(" ").toLowerCase();
+  const hasHeader = /date|libell|libell|description|mont|amount/.test(first) && !/\d{2}[\/.-]\d{2}[\/.-]\d{2,4}/.test(first);
+  const body = hasHeader ? rows.slice(1) : rows;
+  const out = [];
+  body.forEach(cells=>{
+    const dateIdx = cells.findIndex(c=>normalizeCsvDate(c));
+    let amount = null, amountIdx = -1;
+    // en-tête : la colonne crédit porte l'argent entrant
+    if (hasHeader && rows[0].length === cells.length){
+      let creditCol = -1;
+      for (let i=0;i<cells.length;i++){
+        if (i===dateIdx) continue;
+        const h = String(rows[0][i]||"").toLowerCase();
+        if (/crédit|credit|dépôt|depot|deposit|income/.test(h)){ creditCol = i; break; }
+      }
+      if (creditCol > -1){
+        amount = parseMoneyCell(cells[creditCol]);
+        if (amount === null) return;   // ligne débit seule : jamais un revenu
+        amountIdx = creditCol;
+      }
+    }
+    // relevé signé ou sans colonne crédit explicite : première cellule numérique non-date
+    if (amount === null){
+      for (let i=0;i<cells.length;i++){
+        if (i===dateIdx) continue;
+        const cand = parseMoneyCell(cells[i]);
+        if (cand!==null && amountIdx===-1){ amountIdx=i; amount=cand; }
+      }
+    }
+    // libellé = la cellule non-date, non-montant la plus longue
+    let labelIdx = -1;
+    for (let i=0;i<cells.length;i++){
+      if (i===dateIdx || i===amountIdx) continue;
+      if (cells[i] && (labelIdx===-1 || cells[i].length > cells[labelIdx].length)) labelIdx=i;
+    }
+    const date = dateIdx>=0 ? normalizeCsvDate(cells[dateIdx]) : null;
+    if (!date || amount===null || !amount) return;
+    if (amount < 0) return;   // un débit est une dépense — jamais un revenu
+    out.push({ date, label: labelIdx>=0 ? cells[labelIdx].slice(0,60) : "Revenu importé", amount });
+  });
+  return out;
+}
 let csvRows = null;
 function openCsvSheet(rows){
-  if (!rows.length){ toast("Aucune opération reconnaissable dans ce fichier"); return; }
+  const rev = state.kind === "rev";
+  if (!rows.length){ toast(rev ? t("Aucun crédit dans ce fichier") : "Aucune opération reconnaissable dans ce fichier"); return; }
   csvRows = rows;
   const total = rows.reduce((s,r)=>s+r.amount,0);
-  document.getElementById("csv-title").textContent = tt("Import du relevé · {n} opérations", {n: rows.length});
+  document.getElementById("csv-title").textContent = rev
+    ? tt("Import du relevé · {n} revenu(s)", {n: rows.length})
+    : tt("Import du relevé · {n} opérations", {n: rows.length});
   document.getElementById("csv-preview").innerHTML =
-    `<div class="empty" style="padding:4px 0 10px">${tt("Total : ", {})}<b>${money(total)}</b><br><span style="font-size:12px">${t("Catégories devinées automatiquement — modifiables après en tapant une dépense.")}</span></div>
+    `<div class="empty" style="padding:4px 0 10px">${tt("Total : ", {})}<b>${rev ? "+" : ""}${money(total)}</b><br><span style="font-size:12px">${t(rev ? "Seuls les crédits (argent entrant) sont importés." : "Catégories devinées automatiquement — modifiables après en tapant une dépense.")}</span></div>
      <div class="csv-wrap">` + rows.map(r=>{
+       if (rev) return `<div class="csv-row"><span class="csv-d">${r.date.slice(8)}/${r.date.slice(5,7)}</span>
+         <span class="csv-l">${esc(r.label)}</span>
+         <span class="csv-a" style="color:var(--green)">+${money(r.amount)}</span></div>`;
        const c = catOf(r.cat);
        return `<div class="csv-row"><span class="csv-d">${r.date.slice(8)}/${r.date.slice(5,7)}</span>
          <span class="csv-l">${esc(r.label)}</span>
@@ -134,17 +194,19 @@ function closeCsvSheet(){
 }
 function confirmCsvImport(){
   if (!csvRows || !csvRows.length) return;
+  const rev = state.kind === "rev";   // livre revenus : les crédits deviennent des revenus, jamais des dépenses
   let added = 0;
-  const have = new Set(state.expenses.map(e=>e.date + "|" + e.name + "|" + Math.round(+e.amount*100)));   // Set : O(1) par ligne (20k+ dépenses = O(n) au total)
+  const have = new Set((rev ? state.incomes : state.expenses).map(e=>e.date + "|" + e.name + "|" + Math.round(+e.amount*100)));   // Set : O(1) par ligne (20k+ lignes = O(n) au total)
   csvRows.forEach(r=>{
     if (have.has(r.date + "|" + r.label + "|" + Math.round(+r.amount*100))) return;   // pas de doublon exact (même date, même libellé, même montant)
-    state.expenses.push({ id:crypto.randomUUID(), name:r.label, cat: r.cat in state.cats ? r.cat : "other", amount:r.amount, date:r.date, ts:Date.now() });
+    if (rev) state.incomes.push({ id:crypto.randomUUID(), name:r.label, amount:r.amount, date:r.date, ts:Date.now() });
+    else state.expenses.push({ id:crypto.randomUUID(), name:r.label, cat: r.cat in state.cats ? r.cat : "other", amount:r.amount, date:r.date, ts:Date.now() });
     have.add(r.date + "|" + r.label + "|" + Math.round(+r.amount*100));
     added++;
   });
   csvRows = null;
   save(); closeCsvSheet(); render();
-  toast(added ? tt("📥 {n} dépense(s) importée(s)", {n: added}) : t("Rien de nouveau à importer"));
+  toast(added ? tt(rev ? "📥 {n} revenu(s) importé(s)" : "📥 {n} dépense(s) importée(s)", {n: added}) : t("Rien de nouveau à importer"));
 }
 
 /* ============ Utilitaires ============ */
@@ -565,6 +627,35 @@ const I18N_EN = {
   "Période suivante":"Next period",
   "Du":"From",
   "Au":"To",
+  /* --- Livre revenus 📥 --- */
+  "Revenus":"Income",
+  "Revenu":"Income",
+  "Source":"Source",
+  "Nouveau revenu":"New income",
+  "Modifier le revenu":"Edit income",
+  "Ajouter le revenu":"Add income",
+  "Revenu mis à jour":"Income updated",
+  "Revenu ajouté":"Income added",
+  "Revenu supprimé":"Income deleted",
+  "Entre une source":"Enter a source",
+  "Reçu ce mois":"Received this month",
+  "Reçu cette semaine":"Received this week",
+  "Reçu cette année":"Received this year",
+  "Derniers revenus":"Latest income",
+  "{n} revenu(s) ce mois":"{n} income(s) this month",
+  "Tape ＋ pour enregistrer ce que tu reçois.":"Tap ＋ to log money you receive.",
+  "Aucun revenu pour le moment.":"No income yet.",
+  "Plus gros revenu":"Biggest income",
+  "Analyse de tes revenus":"Analysis of your income",
+  "Enregistre ton premier revenu — Kola dessinera tes stats ici.":"Log your first income — Kola will draw your stats here.",
+  "Aucun crédit dans ce fichier":"No credits in this file",
+  "Seuls les crédits (argent entrant) sont importés.":"Only credits (money in) are imported.",
+  "C'est un export revenus Kola — il ne s'importe pas ici.":"It's a Kola income export — it can't import here.",
+  "CSV des revenus exporté":"Income CSV exported",
+  "Source du revenu":"Income source",
+  "Montant du revenu":"Income amount",
+  "Date du revenu":"Income date",
+  "Rechercher un revenu…":"Search for an income…",
 };
 /* Chaînes paramétrées (l'EN remplace le gabarit, {x} remplacés par les params) */
 const I18N_EN_T = {
@@ -659,7 +750,15 @@ const I18N_EN_T = {
   "1 récurrence":"1 recurring expense",
   "et":"and",
   /* --- Historique --- */
-  "Aucune entrée avec « {a} »":"No entries with « {a} »"
+  "Aucune entrée avec « {a} »":"No entries with « {a} »",
+  /* --- Livre revenus --- */
+  "{n} revenu(s)":"{n} income(s)",
+  "{n} revenu(s) · {t}":"{n} income(s) · {t}",
+  "Revenu : {a}, {b}":"Income: {a}, {b}",
+  "Supprimer ce revenu ({a} du {b}) ?":"Delete this income ({a} on {b})?",
+  "Import du relevé · {n} revenu(s)":"Statement import · {n} income(s)",
+  "📥 {n} revenu(s) importé(s)":"📥 {n} income(s) imported",
+  "Supprimer le livre « {a} » et ses {n} revenu(s) ? Action irréversible.":"Delete book « {a} » and its {n} income(s)? Irreversible."
 };
 function i18nLang(){
   const set = state && state.lang;

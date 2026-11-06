@@ -614,5 +614,26 @@ const { parseCreditsCsv } = creditsFns;
   eq(parseCreditsCsv(""), [], "parseCreditsCsv : vide → rien");
 }
 
+/* ======== Aperçu (dashboard) : bookOverview tous types ======== */
+const ovFns = new Function("todayISO", "safeBookName", "safeEmoji", grab("/* ============ Dettes : modèle (fonctions pures) ============", "let backupPending") + "return { bookOverview };")(
+  () => "2026-11-05", x => String(x ?? "").slice(0, 40) || "Livre", x => String(x ?? "📖"));
+const { bookOverview } = ovFns;
+{
+  const mk = expenses => ({ id: "bdep", name: "B_dep", emoji: "📕", data: { kind: "dep", expenses, budget: 500 } });
+  eq(bookOverview(mk([{ date:"2026-11-02", amount:120 }, { date:"2026-10-30", amount:80 }]), "bdep", "2026-11"),
+     { kind:"dep", name:"B_dep", emoji:"📕", isCurrent:true, month:120, other:500, n:2 },
+     "bookOverview dep : mois courant + budget, hors mois exclu");
+  const dt = { id: "bdt", name: "B_dettes", emoji: "🤝", data: { kind: "dettes", debtes: [], debts: [
+    { name:"A", dir:"dois", amount:100, paid:40 }, { name:"B", dir:"me", amount:50, paid:10 } ] } };
+  const o = bookOverview(dt, "autre-livre", "2026-11");
+  check(o.kind === "dettes" && o.month === 60 && o.other === 40 && o.n === 2 && !o.isCurrent,
+        "bookOverview dettes : dois/me SÉPARÉS (60 / 40), jamais de net");
+  const rv = { id: "brv", name: "B_rev", emoji: "📥", data: { kind: "rev", incomes: [{ date:"2026-11-01", amount:450 }] } };
+  const r = bookOverview(rv, "brv", "2026-11");
+  check(r.kind === "rev" && r.month === 450 && r.other === 0, "bookOverview rev : reçu ce mois");
+  check(bookOverview(null, "x", "2026-11") && bookOverview(null, "x", "2026-11").kind === "dep",
+        "bookOverview : livre nul/absent → dep vide");
+}
+
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);

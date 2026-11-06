@@ -1111,6 +1111,7 @@ function render(){
     renderCompare();
   }
   else if (document.getElementById("page-history").classList.contains("active")) renderHistory();
+  else if (document.getElementById("page-overview").classList.contains("active")) renderOverview();
   else if (document.getElementById("page-settings").classList.contains("active")) {
     document.getElementById("budget-input").value = state.budget;
     document.getElementById("currency-select").value = state.currency;

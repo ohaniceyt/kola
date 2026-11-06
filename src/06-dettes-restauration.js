@@ -265,6 +265,29 @@ function renderDettesCard(){
     ? debGroupsHtml()
     : `<div class="hint" style="padding:2px 0 2px">${esc(t("Note un prêt ou une dette en un tap — pour un suivi complet, fais un livre 🤝 Dettes."))}</div>`);
 }
+/* ====== Aperçu (dashboard) : indicateur clé d'un livre, tous types ======
+   Pur : pas d'aller-retour DOM/state — l'appelant passe bookId et le mois.
+   Dettes : DEUX montants (dois / me), jamais une somme nette. */
+function bookOverview(b, bookId, monthPrefix){
+  if (!b) b = { id: "", name: "", emoji: "" };
+  const d = b.data || {};
+  const kind = d.kind === "dettes" ? "dettes" : d.kind === "rev" ? "rev" : "dep";
+  const inMonth = e => String((e || {}).date || "").startsWith(monthPrefix || "");
+  if (kind === "dettes"){
+    const t = debtTotals(d.debts);
+    return { kind, name: safeBookName(b.name), emoji: safeEmoji(b.emoji || "📖"),
+             isCurrent: b.id === bookId, month: t.dois, other: t.me, n: (d.debts || []).length };
+  }
+  if (kind === "rev"){
+    const inc = (d.incomes || []);
+    return { kind, name: safeBookName(b.name), emoji: safeEmoji(b.emoji || "📖"),
+             isCurrent: b.id === bookId, month: inc.filter(inMonth).reduce((s,e)=>s+(+e.amount||0),0), other: 0, n: inc.length };
+  }
+  const ex = (d.expenses || []);
+  return { kind, name: safeBookName(b.name), emoji: safeEmoji(b.emoji || "📖"),
+           isCurrent: b.id === bookId, month: ex.filter(inMonth).reduce((s,e)=>s+(+e.amount||0),0),
+           other: +d.budget || 0, n: ex.length };
+}
 /* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */
 /* --- Validation stricte des champs importés (anti-injection) ---
    Un fichier de sauvegarde vient de l'extérieur (Mail/WhatsApp) : tout ce qui

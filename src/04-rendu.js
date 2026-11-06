@@ -207,6 +207,39 @@ function renderIncomeList(elId, items, compact, emptyMsg){
   host.innerHTML = html;
 }
 
+/* ============ Aperçu : vue d'ensemble de tous les livres ============ */
+/* Chaque livre résumé sur SA propre ligne : montant du livre, jamais un total net croisé. */
+function overviewRow(b){
+  const o = bookOverview(b, state.bookId, todayISO().slice(0,7));
+  const cur = o.isCurrent ? ` <div class="bk-sub">${esc(t("Livre actuel"))}</div>` : "";
+  let amt, sub;
+  if (o.kind === "dettes"){
+    amt = `<div class="amt" style="color:var(--red)">💸 ${money(o.month)}</div>`;
+    sub = esc(tt("🤝 On me doit {a}", { a: money(o.other) })) + (o.n ? ` · ${esc(tt("{n} dette(s)", { n: o.n }))}` : "");
+  } else if (o.kind === "rev"){
+    amt = `<div class="amt" style="color:var(--green)">+${money(o.month)}</div>`;
+    sub = esc(t("Reçu ce mois")) + (o.n ? ` · ${esc(tt("{n} revenu(s)", { n: o.n }))}` : "");
+  } else {
+    amt = `<div class="amt">${money(o.month)}</div>`;
+    sub = o.other ? esc(tt("Budget {a}", { a: money(o.other) })) + ` · ${esc(tt("{n} dépense(s)", { n: o.n }))}` : esc(tt("{n} dépense(s)", { n: o.n }));
+  }
+  return `<div class="rowitem" role="button" tabindex="0" onclick="bookSwitch('${b.id}')"
+    aria-label="${esc(tt("Ouvrir le livre {a}", { a: o.name }))}">
+    <div class="icon-badge" style="background:var(--fill);font-size:18px">${esc(o.emoji)}</div>
+    <div class="txt"><div class="n">${esc(o.name)}${cur}</div><div class="d">${sub}</div></div>
+    ${amt}
+  </div>`;
+}
+function renderOverview(){
+  const label = new Date().toLocaleDateString(I18N_LOCALE(), { month:"long", year:"numeric" });
+  document.getElementById("overview-sub").textContent = tt("{n} livre(s)", { n: getBooks().length }) + " · " + label;
+  document.getElementById("overview-list").innerHTML = `<div class="group">${getBooks().map(overviewRow).join("")}</div>
+    <div class="setrow" onclick="openBookSheet()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(var(--accent-rgb),.12)">＋</div>
+      <div class="n">${esc(t("Ajouter un livre"))}</div>
+    </div>`;
+}
+
 function drawDonut(svgId, legendId, byCat){
   const svg = document.getElementById(svgId), legend = document.getElementById(legendId);
   const total = Object.values(byCat).reduce((s,v)=>s+v,0);

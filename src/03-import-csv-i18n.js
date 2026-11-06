@@ -658,6 +658,11 @@ const I18N_EN = {
   "Rechercher un revenu…":"Search for an income…",
   "Déplacer vers la gauche":"Move left",
   "Déplacer vers la droite":"Move right",
+  /* --- Aperçu --- */
+  "Aperçu":"Overview",
+  "🤝 On me doit {a}":"🤝 You are owed {a}",
+  "Ouvrir le livre {a}":"Open book {a}",
+  "Budget {a}":"Budget {a}",
 };
 /* Chaînes paramétrées (l'EN remplace le gabarit, {x} remplacés par les params) */
 const I18N_EN_T = {

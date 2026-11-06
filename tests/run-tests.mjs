@@ -159,21 +159,19 @@ check(firstOccur({freq:"w", wd:0}) >= today, "récurrence hebdo : jamais rétroa
 eq(nextOccur({freq:"m", day:5}, "2026-12-05"), "2027-01-05", "nextOccur décembre → janvier");
 eq(nextOccur({freq:"m", day:31}, "2026-01-31"), "2026-02-28", "nextOccur jour 31 clôt au 28");
 eq(nextOccur({freq:"w", wd:0}, "2026-10-05"), "2026-10-12", "nextOccur hebdo +7 jours");
-// processRecurring : rattrapage complet
+// processRecurring : rattrapage complet (date figée → test déterministe, peu importe le jour réel)
 {
   const state = { expenses: [], recurring: [{ name: "Loyer", cat: "food", amount: 700, freq: "m", day: 5, lastAdded: "2026-09-05" }] };
-  const fns = new Function("ymd", "todayISO", "state", "save", grab("/* ============ Dépenses récurrentes ============ */", "function renderRecurring") + "return { processRecurring };")(ymd, todayISO, state, () => {});
+  const fns = new Function("ymd", "todayISO", "state", "save", grab("/* ============ Dépenses récurrentes ============ */", "function renderRecurring") + "return { processRecurring };")(ymd, () => "2026-10-22", state, () => {});
   fns.processRecurring();
-  // rattrapage complet : toutes les occurrences échues depuis le dernier ajout (5 de chaque mois)
-  const occ = 1 + (today >= "2026-11-05" ? 1 : 0);
-  check(state.expenses.length === occ, "rattrapage : occurrence(s) échue(s) depuis septembre");
+  check(state.expenses.length === 1, "rattrapage : 1 occurrence échue (octobre)");
   eq(state.expenses[0]?.date, "2026-10-05", "rattrapage : date de l'occurrence");
-  eq(state.recurring[0].lastAdded, occ === 1 ? "2026-10-05" : today, "rattrapage : lastAdded avancé");
+  eq(state.recurring[0].lastAdded, "2026-10-05", "rattrapage : lastAdded avancé");
   // nouvelle récurrence créée en cours de mois, jour déjà passé : rien d'inséré
   const st2 = { expenses: [], recurring: [{ name: "Netflix", cat: "fun", amount: 13.5, freq: "m", day: 1, lastAdded: "" }] };
-  const fns2 = new Function("ymd", "todayISO", "state", "save", grab("/* ============ Dépenses récurrentes ============ */", "function renderRecurring") + "return { processRecurring };")(ymd, todayISO, st2, () => {});
+  const fns2 = new Function("ymd", "todayISO", "state", "save", grab("/* ============ Dépenses récurrentes ============ */", "function renderRecurring") + "return { processRecurring };")(ymd, () => "2026-10-22", st2, () => {});
   fns2.processRecurring();
-  eq(st2.expenses.length, today.slice(8) < "01" ? 1 : 0, "création en cours de mois avec jour passé : pas d'ajout rétroactif");
+  eq(st2.expenses.length, 0, "création en cours de mois avec jour passé : pas d'ajout rétroactif");
 }
 
 /* ======== Budget couple ======== */
